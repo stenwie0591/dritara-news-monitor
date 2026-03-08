@@ -1,6 +1,5 @@
-import asyncio
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 import httpx
@@ -13,15 +12,17 @@ from src.models import Article, PublishQueue
 
 load_dotenv()
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN_ID = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
+TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN")
+ADMIN_ID     = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
 COMMUNITY_ID = int(os.getenv("TELEGRAM_COMMUNITY_CHAT_ID"))
-THREAD_ID = int(os.getenv("TELEGRAM_NEWS_THREAD_ID"))
+THREAD_ID    = int(os.getenv("TELEGRAM_NEWS_THREAD_ID"))
 
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
-PUBLISH_HOURS = [9, 13, 18, 22]
-MAX_DAILY = 4
+# Orari in ordine di priorità
+PUBLISH_HOURS = [18, 13, 9, 22]
+MAX_DAILY     = 4
+MAX_DEFERRALS = 4
 
 
 # ── API Telegram ───────────────────────────────────────────────
@@ -47,23 +48,50 @@ async def _send(chat_id: int, text: str, thread_id: Optional[int] = None) -> Opt
 
 # ── Notifica admin ─────────────────────────────────────────────
 async def notify_admin(articles: list[dict], digest_date: date) -> None:
-    if not articles:
-        await _send(ADMIN_ID, "📭 Nessun articolo in Sezione 1 oggi.")
+    """
+    Manda all'admin la lista articoli del giorno.
+    Prima mostra i deferred del giorno precedente, poi i nuovi.
+    """
+    # Carica deferred dei giorni precedenti
+    deferred = _get_deferred_articles()
+
+    if not articles and not deferred:
+        await _send(ADMIN_ID, "📭 Nessun articolo disponibile oggi.")
         return
 
     lines = []
     lines.append(f"📋 *DRITARA — Articoli del {digest_date.strftime('%d/%m/%Y')}*")
-    lines.append(f"Seleziona quali pubblicare oggi (max {MAX_DAILY}).")
-    lines.append(f"Rispondi con `/ok` seguito dai numeri, es: `/ok 1 3`\n")
+    lines.append(f"Rispondi con `/ok` seguito dai numeri (max {MAX_DAILY}), es: `/ok 1 3`\n")
 
-    for i, a in enumerate(articles, 1):
-        score = a.get("score", 0)
-        source = a.get("feed_name", "")
-        title = a.get("title", "")
-        url = a.get("url", "")
-        lines.append(f"*{i}.* [{title}]({url})\n   _{source} · score {score:.1f}_\n")
+    all_articles = []
 
-    _save_pending(articles, digest_date)
+    # Prima i deferred (con etichetta)
+    if deferred:
+        lines.append("*⏭️ In attesa dai giorni precedenti:*")
+        for item in deferred:
+            a = item["article"]
+            count = item["deferred_count"]
+            all_articles.append({"source": "deferred", "queue_id": item["queue_id"], **a})
+            i = len(all_articles)
+            lines.append(
+                f"*{i}.* [{a['title']}]({a['url']})\n"
+                f"   _{a['feed_name']} · score {a['score']:.1f} · rimandato {count}x_\n"
+            )
+
+    # Poi i nuovi
+    if articles:
+        if deferred:
+            lines.append("*🆕 Nuovi di oggi:*")
+        for a in articles:
+            all_articles.append({"source": "new", **a})
+            i = len(all_articles)
+            lines.append(
+                f"*{i}.* [{a['title']}]({a['url']})\n"
+                f"   _{a['feed_name']} · score {a['score']:.1f}_\n"
+            )
+
+    # Salva tutti in pending
+    _save_pending(all_articles, digest_date)
 
     text = "\n".join(lines)
     if len(text) > 4096:
@@ -73,7 +101,7 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
     else:
         await _send(ADMIN_ID, text)
 
-    logger.info(f"Notifica admin inviata — {len(articles)} articoli in lista")
+    logger.info(f"Notifica admin — {len(deferred)} deferred + {len(articles)} nuovi")
 
 
 # ── Pubblicazione nel topic ────────────────────────────────────
@@ -93,8 +121,9 @@ async def publish_article(article: dict) -> bool:
         lines.append(f"\n_{short_excerpt}_")
     lines.append(f"\n[Leggi su {source}]({url})")
 
-    text = "\n".join(lines)
-    msg_id = await _send(COMMUNITY_ID, text, thread_id=THREAD_ID)
+    # Avvisa admin prima di pubblicare nel topic
+    await _send(ADMIN_ID, f"📤 Sto pubblicando nel topic:\n*{title[:80]}*")
+    msg_id = await _send(COMMUNITY_ID, "\n".join(lines), thread_id=THREAD_ID)
 
     if msg_id:
         logger.info(f"Pubblicato nel topic: {title[:60]}...")
@@ -103,8 +132,48 @@ async def publish_article(article: dict) -> bool:
 
 
 # ── Coda pubblicazione ─────────────────────────────────────────
-def _save_pending(articles: list[dict], digest_date: date) -> None:
+def _get_deferred_articles() -> list[dict]:
+    """
+    Recupera gli articoli deferred dei giorni precedenti
+    con deferred_count < MAX_DEFERRALS.
+    """
     session = next(get_session())
+    today = date.today()
+
+    queue = session.exec(
+        select(PublishQueue).where(
+            PublishQueue.digest_date < today,
+            PublishQueue.status == "deferred",
+            PublishQueue.deferred_count < MAX_DEFERRALS,
+        ).order_by(PublishQueue.deferred_count.desc(), PublishQueue.position)
+    ).all()
+
+    result = []
+    for q in queue:
+        article = session.get(Article, q.article_id)
+        if article:
+            result.append({
+                "queue_id": q.id,
+                "deferred_count": q.deferred_count,
+                "article": {
+                    "id": article.id,
+                    "title": article.title,
+                    "excerpt": article.excerpt,
+                    "feed_name": article.feed_name,
+                    "url": article.url,
+                    "score": article.score,
+                },
+            })
+
+    session.close()
+    return result
+
+
+def _save_pending(articles: list[dict], digest_date: date) -> None:
+    """Salva articoli in coda pending per oggi."""
+    session = next(get_session())
+
+    # Rimuovi pending precedenti per oggi
     existing = session.exec(
         select(PublishQueue).where(
             PublishQueue.digest_date == digest_date,
@@ -116,23 +185,38 @@ def _save_pending(articles: list[dict], digest_date: date) -> None:
     session.commit()
 
     for i, a in enumerate(articles, 1):
-        q = PublishQueue(
-            article_id=a["id"],
-            digest_date=digest_date,
-            position=i,
-            status="pending",
-        )
-        session.add(q)
+        # Se è un deferred, aggiorna il record originale
+        if a.get("source") == "deferred" and a.get("queue_id"):
+            original = session.get(PublishQueue, a["queue_id"])
+            if original:
+                original.digest_date = digest_date
+                original.position = i
+                original.status = "pending"
+                session.add(original)
+        else:
+            q = PublishQueue(
+                article_id=a["id"],
+                digest_date=digest_date,
+                position=i,
+                status="pending",
+                deferred_count=0,
+            )
+            session.add(q)
+
     session.commit()
     session.close()
     logger.info(f"Salvati {len(articles)} articoli in coda pending")
 
 
 def approve_articles(positions: list[int], digest_date: date) -> int:
+    """Approva le posizioni indicate, rimanda il resto."""
     session = next(get_session())
     approved = 0
 
-    for pos in positions[:MAX_DAILY]:
+    # Assegna orari in base alla priorità
+    hours = PUBLISH_HOURS[:len(positions)]
+
+    for idx, pos in enumerate(positions[:MAX_DAILY]):
         q = session.exec(
             select(PublishQueue).where(
                 PublishQueue.digest_date == digest_date,
@@ -142,9 +226,11 @@ def approve_articles(positions: list[int], digest_date: date) -> int:
         ).first()
         if q:
             q.status = "approved"
+            q.scheduled_hour = hours[idx] if idx < len(hours) else PUBLISH_HOURS[-1]
             session.add(q)
             approved += 1
 
+    # Gli altri → deferred, incrementa contatore
     pending = session.exec(
         select(PublishQueue).where(
             PublishQueue.digest_date == digest_date,
@@ -152,22 +238,30 @@ def approve_articles(positions: list[int], digest_date: date) -> int:
         )
     ).all()
     for p in pending:
-        p.status = "deferred"
+        p.deferred_count += 1
+        if p.deferred_count >= MAX_DEFERRALS:
+            p.status = "discarded"
+            logger.info(f"Articolo scartato dopo {MAX_DEFERRALS} deferrals: {p.article_id[:16]}...")
+        else:
+            p.status = "deferred"
         session.add(p)
 
     session.commit()
     session.close()
-    logger.info(f"Approvati {approved} articoli, resto rimandato a domani")
+    logger.info(f"Approvati {approved} articoli, resto rimandato")
     return approved
 
 
-def get_next_to_publish(publish_date: date) -> Optional[dict]:
+def get_next_to_publish(publish_date: date, hour: int) -> Optional[dict]:
+    """Ritorna l'articolo approvato per l'ora indicata."""
     session = next(get_session())
+
     q = session.exec(
         select(PublishQueue).where(
             PublishQueue.digest_date == publish_date,
             PublishQueue.status == "approved",
-        ).order_by(PublishQueue.position)
+            PublishQueue.scheduled_hour == hour,
+        )
     ).first()
 
     if not q:
@@ -188,7 +282,6 @@ def get_next_to_publish(publish_date: date) -> Optional[dict]:
         "feed_name": article.feed_name,
         "url": article.url,
         "score": article.score,
-        "section": article.section,
     }
 
 

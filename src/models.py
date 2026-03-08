@@ -97,3 +97,15 @@ class KeywordConfig(SQLModel, table=True):
     weight: float
     active: bool = Field(default=True)
     added_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PublishQueue(SQLModel, table=True):
+    """Coda di pubblicazione articoli approvati dall'admin."""
+    id:           Optional[int]      = Field(default=None, primary_key=True)
+    article_id:   str                = Field(foreign_key="article.id")
+    digest_date:  date               = Field(index=True)
+    position:     int                = Field()          # numero mostrato all'admin
+    status:        str                = Field(default="pending")  # pending/approved/published/deferred
+    deferred_count:  int               = Field(default=0)
+    scheduled_hour:  Optional[int]     = Field(default=None)
+    published_at: Optional[datetime] = Field(default=None)
