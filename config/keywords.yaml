@@ -1,0 +1,60 @@
+clusters:
+  A:
+    name: "Geo Sud"
+    keywords:
+      - { word: "sud",         weight: 1.5 }
+      - { word: "mezzogiorno", weight: 1.5 }
+      - { word: "calabria",    weight: 2.0 }
+      - { word: "campania",    weight: 2.0 }
+      - { word: "puglia",      weight: 2.0 }
+      - { word: "sicilia",     weight: 2.0 }
+      - { word: "basilicata",  weight: 2.0 }
+      - { word: "molise",      weight: 1.8 }
+      - { word: "sardegna",    weight: 1.5 }
+      - { word: "napoli",      weight: 1.8 }
+      - { word: "palermo",     weight: 1.8 }
+      - { word: "reggio",      weight: 1.5 }
+      - { word: "cosenza",     weight: 2.0 }
+      - { word: "catanzaro",   weight: 1.8 }
+      - { word: "bari",        weight: 1.8 }
+      - { word: "catania",     weight: 1.8 }
+      - { word: "messina",     weight: 1.5 }
+      - { word: "salerno",     weight: 1.5 }
+      - { word: "taranto",     weight: 1.5 }
+
+  B:
+    name: "Tech"
+    keywords:
+      - { word: "innovazione",         weight: 1.5 }
+      - { word: "digitale",            weight: 1.5 }
+      - { word: "startup",             weight: 2.0 }
+      - { word: "intelligenza artificiale", weight: 2.0 }
+      - { word: "ai",                  weight: 1.5 }
+      - { word: "tech",                weight: 1.5 }
+      - { word: "tecnologia",          weight: 1.5 }
+      - { word: "blockchain",          weight: 1.5 }
+      - { word: "cloud",               weight: 1.2 }
+      - { word: "cybersecurity",       weight: 1.5 }
+      - { word: "fintech",             weight: 1.8 }
+      - { word: "edtech",              weight: 1.8 }
+      - { word: "deeptech",            weight: 1.8 }
+      - { word: "hub digitale",        weight: 2.0 }
+      - { word: "pnrr",                weight: 1.8 }
+      - { word: "digital",             weight: 1.5 }
+      - { word: "open innovation",     weight: 1.8 }
+      - { word: "venture capital",     weight: 1.5 }
+      - { word: "incubatore",          weight: 1.5 }
+      - { word: "acceleratore",        weight: 1.5 }
+
+  C:
+    name: "Lavoro e Formazione"
+    keywords:
+      - { word: "occupazione",         weight: 1.2 }
+      - { word: "lavoro",              weight: 1.0 }
+      - { word: "formazione",          weight: 1.2 }
+      - { word: "competenze digitali", weight: 2.0 }
+      - { word: "reskilling",          weight: 1.8 }
+      - { word: "upskilling",          weight: 1.8 }
+      - { word: "stem",                weight: 1.5 }
+      - { word: "università",          weight: 1.0 }
+      - { word: "ricerca",             weight: 1.0 }

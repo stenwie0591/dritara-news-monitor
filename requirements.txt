@@ -1,0 +1,27 @@
+# Feed
+feedparser==6.0.11
+httpx==0.27.0
+
+# Database
+sqlmodel==0.0.16
+
+# Config
+pydantic-settings==2.2.1
+pyyaml==6.0.1
+python-dotenv==1.0.1
+
+# Keyword matching
+rapidfuzz==3.6.1
+
+# Telegram
+python-telegram-bot==21.3
+
+# Google Drive
+google-api-python-client==2.126.0
+google-auth-oauthlib==1.2.0
+
+# Scheduling
+APScheduler==3.10.4
+
+# Logging
+loguru==0.7.2

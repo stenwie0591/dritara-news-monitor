@@ -1,0 +1,33 @@
+system:
+  log_level: INFO
+  log_rotation: monthly
+
+scoring:
+  title_multiplier: 2.0
+  excerpt_multiplier: 1.0
+  source_bonus:
+    level_1: 0.5
+    level_2: 0.0
+    level_3: 1.0
+  score_threshold: 1.5
+
+sections:
+  section3_max_articles: 5
+
+deduplication:
+  similarity_threshold: 0.85
+
+scheduler:
+  daily_digest_hour: 7
+  daily_digest_minute: 0
+  heartbeat_hour: 7
+  heartbeat_minute: 5
+  weekly_digest_day: sunday
+  weekly_digest_hour: 9
+  backup_day: sunday
+  backup_hour: 23
+
+fetch:
+  timeout_seconds: 15
+  max_retries: 2
+  max_concurrent_feeds: 10
