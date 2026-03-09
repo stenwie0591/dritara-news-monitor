@@ -21,6 +21,7 @@ from src.deduplicator import Deduplicator
 from src.fetcher import fetch_all_feeds
 from src.models import Article
 from src.scorer import build_scorer
+from src.monitor import send_heartbeat
 from src.sender_telegram import (
     PUBLISH_HOURS,
     get_next_to_publish,
@@ -126,6 +127,15 @@ def build_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=7, minute=0, timezone="Europe/Rome"),
         id="fetch_and_notify",
         name="Fetch + Notifica admin",
+        replace_existing=True,
+    )
+
+    # Heartbeat alle 7:05
+    scheduler.add_job(
+        send_heartbeat,
+        CronTrigger(hour=7, minute=5, timezone="Europe/Rome"),
+        id="heartbeat",
+        name="Heartbeat sistema",
         replace_existing=True,
     )
 
