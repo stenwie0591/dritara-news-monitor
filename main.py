@@ -20,7 +20,7 @@ async def main() -> None:
     scheduler.start()
     logger.info("Scheduler attivo — jobs programmati:")
     for job in scheduler.get_jobs():
-        logger.info(f"  {job.name} — prossima esecuzione: {job.next_run_time}")
+        logger.info(f"  {job.name}")
 
     # Avvia bot in long polling (blocca qui)
     try:
