@@ -8,7 +8,6 @@ from sqlmodel import Session
 from src.database import get_active_keywords
 from src.models import KeywordConfig
 
-
 # ── Keyword che richiedono contesto rafforzato ─────────────────
 # Vengono accettate solo se appaiono con almeno una keyword
 # dello stesso cluster nello stesso campo (titolo o excerpt).
@@ -44,9 +43,7 @@ class Scorer:
     EXCERPT_MULTIPLIER = 1.0
 
     def __init__(self, keywords: list[KeywordConfig]):
-        self._patterns: dict[str, list[tuple]] = {
-            "A": [], "B": [], "C": []
-        }
+        self._patterns: dict[str, list[tuple]] = {"A": [], "B": [], "C": []}
         self._compile(keywords)
         logger.info(
             f"Scorer inizializzato — "
@@ -58,10 +55,7 @@ class Scorer:
     def _compile(self, keywords: list[KeywordConfig]) -> None:
         """Pre-compila i pattern regex con word-boundary."""
         for kw in keywords:
-            pattern = re.compile(
-                r"\b" + re.escape(kw.keyword) + r"\b",
-                re.IGNORECASE
-            )
+            pattern = re.compile(r"\b" + re.escape(kw.keyword) + r"\b", re.IGNORECASE)
             self._patterns[kw.cluster].append((pattern, kw.weight, kw.keyword))
 
     def _match_text(self, text: str, cluster: str) -> tuple[float, list[str]]:
@@ -112,8 +106,7 @@ class Scorer:
             e_score, e_found = self._match_text(excerpt, cluster)
 
             cluster_score = (
-                t_score * self.TITLE_MULTIPLIER +
-                e_score * self.EXCERPT_MULTIPLIER
+                t_score * self.TITLE_MULTIPLIER + e_score * self.EXCERPT_MULTIPLIER
             )
             found = list(set(t_found + e_found))
 
@@ -130,9 +123,7 @@ class Scorer:
         detail["feed_level"] = feed_level
 
         # ── Score totale ───────────────────────────────────────
-        base_score = sum(
-            detail[f"cluster_{c}_score"] for c in ("A", "B", "C")
-        )
+        base_score = sum(detail[f"cluster_{c}_score"] for c in ("A", "B", "C"))
         total = round(base_score + bonus, 3)
         detail["total"] = total
 
@@ -141,7 +132,21 @@ class Scorer:
         has_B = has_cluster["B"]
         has_C = has_cluster["C"]
 
-        if has_A and (has_B or has_C):
+        # Soglia minima per section1
+        SECTION1_MIN_SCORE = 8.0
+
+        # Feed locali (livello 3): il cluster B deve essere nel titolo
+        level3_b_in_title = True
+        if feed_level == 3:
+            _, b_title_found = self._match_text(title, "B")
+            level3_b_in_title = len(b_title_found) > 0
+
+        if (
+            has_A
+            and (has_B or has_C)
+            and total >= SECTION1_MIN_SCORE
+            and level3_b_in_title
+        ):
             section = "section1"
         elif has_B or has_C:
             section = "section2"
