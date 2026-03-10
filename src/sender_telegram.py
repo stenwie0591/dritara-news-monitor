@@ -1,5 +1,5 @@
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Optional
 
 import httpx
@@ -12,21 +12,23 @@ from src.models import Article, PublishQueue
 
 load_dotenv()
 
-TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN_ID     = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ADMIN_ID = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
 COMMUNITY_ID = int(os.getenv("TELEGRAM_COMMUNITY_CHAT_ID"))
-THREAD_ID    = int(os.getenv("TELEGRAM_NEWS_THREAD_ID"))
+THREAD_ID = int(os.getenv("TELEGRAM_NEWS_THREAD_ID"))
 
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
 # Orari in ordine di priorità
 PUBLISH_HOURS = [18, 13, 9, 22]
-MAX_DAILY     = 4
+MAX_DAILY = 4
 MAX_DEFERRALS = 4
 
 
 # ── API Telegram ───────────────────────────────────────────────
-async def _send(chat_id: int, text: str, thread_id: Optional[int] = None) -> Optional[int]:
+async def _send(
+    chat_id: int, text: str, thread_id: Optional[int] = None
+) -> Optional[int]:
     payload = {
         "chat_id": chat_id,
         "text": text,
@@ -61,7 +63,9 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
 
     lines = []
     lines.append(f"📋 *DRITARA — Articoli del {digest_date.strftime('%d/%m/%Y')}*")
-    lines.append(f"Rispondi con `/ok` seguito dai numeri (max {MAX_DAILY}), es: `/ok 1 3`\n")
+    lines.append(
+        f"Rispondi con `/ok` seguito dai numeri (max {MAX_DAILY}), es: `/ok 1 3`\n"
+    )
 
     all_articles = []
 
@@ -71,7 +75,9 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
         for item in deferred:
             a = item["article"]
             count = item["deferred_count"]
-            all_articles.append({"source": "deferred", "queue_id": item["queue_id"], **a})
+            all_articles.append(
+                {"source": "deferred", "queue_id": item["queue_id"], **a}
+            )
             i = len(all_articles)
             lines.append(
                 f"*{i}.* [{a['title']}]({a['url']})\n"
@@ -106,14 +112,16 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
 
 # ── Pubblicazione nel topic ────────────────────────────────────
 async def publish_article(article: dict) -> bool:
-    title   = article.get("title", "")
+    title = article.get("title", "")
     excerpt = article.get("excerpt", "")
-    source  = article.get("feed_name", "")
-    url     = article.get("url", "")
+    source = article.get("feed_name", "")
+    url = article.get("url", "")
 
     short_excerpt = ""
     if excerpt:
-        short_excerpt = excerpt[:200].rsplit(" ", 1)[0] + "…" if len(excerpt) > 200 else excerpt
+        short_excerpt = (
+            excerpt[:200].rsplit(" ", 1)[0] + "…" if len(excerpt) > 200 else excerpt
+        )
 
     lines = []
     lines.append(f"*{title}*")
@@ -141,29 +149,33 @@ def _get_deferred_articles() -> list[dict]:
     today = date.today()
 
     queue = session.exec(
-        select(PublishQueue).where(
+        select(PublishQueue)
+        .where(
             PublishQueue.digest_date < today,
             PublishQueue.status == "deferred",
             PublishQueue.deferred_count < MAX_DEFERRALS,
-        ).order_by(PublishQueue.deferred_count.desc(), PublishQueue.position)
+        )
+        .order_by(PublishQueue.deferred_count.desc(), PublishQueue.position)
     ).all()
 
     result = []
     for q in queue:
         article = session.get(Article, q.article_id)
         if article:
-            result.append({
-                "queue_id": q.id,
-                "deferred_count": q.deferred_count,
-                "article": {
-                    "id": article.id,
-                    "title": article.title,
-                    "excerpt": article.excerpt,
-                    "feed_name": article.feed_name,
-                    "url": article.url,
-                    "score": article.score,
-                },
-            })
+            result.append(
+                {
+                    "queue_id": q.id,
+                    "deferred_count": q.deferred_count,
+                    "article": {
+                        "id": article.id,
+                        "title": article.title,
+                        "excerpt": article.excerpt,
+                        "feed_name": article.feed_name,
+                        "url": article.url,
+                        "score": article.score,
+                    },
+                }
+            )
 
     session.close()
     return result
@@ -214,7 +226,7 @@ def approve_articles(positions: list[int], digest_date: date) -> int:
     approved = 0
 
     # Assegna orari in base alla priorità
-    hours = PUBLISH_HOURS[:len(positions)]
+    hours = PUBLISH_HOURS[: len(positions)]
 
     for idx, pos in enumerate(positions[:MAX_DAILY]):
         q = session.exec(
@@ -241,7 +253,9 @@ def approve_articles(positions: list[int], digest_date: date) -> int:
         p.deferred_count += 1
         if p.deferred_count >= MAX_DEFERRALS:
             p.status = "discarded"
-            logger.info(f"Articolo scartato dopo {MAX_DEFERRALS} deferrals: {p.article_id[:16]}...")
+            logger.info(
+                f"Articolo scartato dopo {MAX_DEFERRALS} deferrals: {p.article_id[:16]}..."
+            )
         else:
             p.status = "deferred"
         session.add(p)
@@ -294,3 +308,30 @@ def mark_published(queue_id: int) -> None:
         session.add(q)
         session.commit()
     session.close()
+
+
+def discard_articles(positions: list[int], digest_date: date) -> int:
+    """
+    Scarta manualmente gli articoli nelle posizioni indicate.
+    Li segna come 'discarded' così non riappaiono nei giorni successivi.
+    """
+    session = next(get_session())
+    discarded = 0
+
+    for pos in positions:
+        q = session.exec(
+            select(PublishQueue).where(
+                PublishQueue.digest_date == digest_date,
+                PublishQueue.position == pos,
+                PublishQueue.status == "pending",
+            )
+        ).first()
+        if q:
+            q.status = "discarded"
+            session.add(q)
+            discarded += 1
+
+    session.commit()
+    session.close()
+    logger.info(f"Scartati manualmente {discarded} articoli alle posizioni {positions}")
+    return discarded

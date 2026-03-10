@@ -5,6 +5,7 @@ Comandi supportati:
   /ok 1 3  — approva gli articoli nelle posizioni indicate
   /status  — mostra lo stato della coda di oggi
 """
+
 import asyncio
 import os
 from datetime import date
@@ -16,16 +17,13 @@ from loguru import logger
 from src.sender_telegram import (
     MAX_DAILY,
     PUBLISH_HOURS,
-    approve_articles,
-    get_next_to_publish,
-    mark_published,
-    publish_article,
     _send,
+    approve_articles,
 )
 
 load_dotenv()
 
-TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN")
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
@@ -40,7 +38,11 @@ async def run_bot() -> None:
             try:
                 r = await client.get(
                     f"{BASE_URL}/getUpdates",
-                    params={"offset": offset, "timeout": 30, "allowed_updates": ["message"]},
+                    params={
+                        "offset": offset,
+                        "timeout": 30,
+                        "allowed_updates": ["message"],
+                    },
                 )
                 updates = r.json().get("result", [])
                 for update in updates:
@@ -55,26 +57,37 @@ async def run_bot() -> None:
 
 
 async def _handle(update: dict) -> None:
-    msg     = update.get("message", {})
+    msg = update.get("message", {})
     chat_id = msg.get("chat", {}).get("id")
-    text    = msg.get("text", "").strip()
+    text = msg.get("text", "").strip()
 
     if chat_id != ADMIN_ID:
         return
 
     if text == "/start":
-        await _send(ADMIN_ID, (
-            "👋 *Dritara Monitor attivo.*\n\n"
-            "Ogni mattina riceverai la lista degli articoli selezionati.\n"
-            "Rispondi con `/ok` seguito dai numeri per approvarli, es: `/ok 1 3`\n"
-            "Usa `/status` per vedere lo stato della coda di oggi."
-        ))
+        await _send(
+            ADMIN_ID,
+            (
+                "👋 *Dritara Monitor attivo.*\n\n"
+                "Ogni mattina riceverai la lista degli articoli selezionati.\n\n"
+                "Comandi disponibili:\n"
+                "• `/ok 1 3` — approva gli articoli nelle posizioni indicate\n"
+                "• `/scarta 2 4` — scarta articoli fuori tema (non verranno riproposti)\n"
+                "• `/status` — stato della coda di oggi"
+            ),
+        )
+
     elif text.startswith("/ok"):
         await _handle_ok(text)
+    elif text.startswith("/scarta"):
+        await _handle_scarta(text)
     elif text == "/status":
         await _handle_status()
     else:
-        await _send(ADMIN_ID, "Comando non riconosciuto. Usa `/ok 1 3` oppure `/status`.")
+        await _send(
+            ADMIN_ID,
+            "Comando non riconosciuto. Usa `/ok 1 3`, `/scarta 2 4` oppure `/status`.",
+        )
 
 
 async def _handle_ok(text: str) -> None:
@@ -87,11 +100,15 @@ async def _handle_ok(text: str) -> None:
     try:
         positions = [int(p) for p in parts]
     except ValueError:
-        await _send(ADMIN_ID, "⚠️ Numeri non validi. Usa solo numeri interi, es: `/ok 1 3`")
+        await _send(
+            ADMIN_ID, "⚠️ Numeri non validi. Usa solo numeri interi, es: `/ok 1 3`"
+        )
         return
 
     if len(positions) > MAX_DAILY:
-        await _send(ADMIN_ID, f"⚠️ Puoi approvare al massimo {MAX_DAILY} articoli al giorno.")
+        await _send(
+            ADMIN_ID, f"⚠️ Puoi approvare al massimo {MAX_DAILY} articoli al giorno."
+        )
         positions = positions[:MAX_DAILY]
 
     approved = approve_articles(positions, date.today())
@@ -102,16 +119,20 @@ async def _handle_ok(text: str) -> None:
 
     # Mostra orari assegnati
     orari = [f"{PUBLISH_HOURS[i]}:00" for i in range(approved)]
-    await _send(ADMIN_ID, (
-        f"✅ *{approved} articoli approvati.*\n"
-        f"Pubblicazione prevista: {' · '.join(orari)}\n"
-        f"Ti avviserò prima di ogni pubblicazione."
-    ))
+    await _send(
+        ADMIN_ID,
+        (
+            f"✅ *{approved} articoli approvati.*\n"
+            f"Pubblicazione prevista: {' · '.join(orari)}\n"
+            f"Ti avviserò prima di ogni pubblicazione."
+        ),
+    )
     logger.info(f"Admin ha approvato posizioni {positions}")
 
 
 async def _handle_status() -> None:
     from sqlmodel import select
+
     from src.database import get_session
     from src.models import PublishQueue
 
@@ -129,12 +150,53 @@ async def _handle_status() -> None:
         await _send(ADMIN_ID, "📭 Nessun articolo in coda per oggi.")
         return
 
-    emoji = {"pending": "⏳", "approved": "✅", "published": "📤", "deferred": "⏭️", "discarded": "🗑️"}
+    emoji = {
+        "pending": "⏳",
+        "approved": "✅",
+        "published": "📤",
+        "deferred": "⏭️",
+        "discarded": "🗑️",
+    }
     lines = [f"📊 *Coda del {today.strftime('%d/%m/%Y')}*\n"]
 
     for q in queue:
         e = emoji.get(q.status, "•")
-        ora = f" — ore {q.scheduled_hour}:00" if q.scheduled_hour and q.status == "approved" else ""
+        ora = (
+            f" — ore {q.scheduled_hour}:00"
+            if q.scheduled_hour and q.status == "approved"
+            else ""
+        )
         lines.append(f"{e} #{q.position}{ora} — {q.status}")
 
     await _send(ADMIN_ID, "\n".join(lines))
+
+
+async def _handle_scarta(text: str) -> None:
+    parts = text.split()[1:]
+
+    if not parts:
+        await _send(ADMIN_ID, "⚠️ Specifica i numeri degli articoli, es: `/scarta 2 4`")
+        return
+
+    try:
+        positions = [int(p) for p in parts]
+    except ValueError:
+        await _send(
+            ADMIN_ID, "⚠️ Numeri non validi. Usa solo numeri interi, es: `/scarta 2 4`"
+        )
+        return
+
+    discarded = discard_articles(positions, date.today())
+
+    if discarded == 0:
+        await _send(ADMIN_ID, "⚠️ Nessun articolo trovato per le posizioni indicate.")
+        return
+
+    await _send(
+        ADMIN_ID,
+        (
+            f"🗑️ *{discarded} articoli scartati.*\n"
+            f"Non verranno pubblicati né riproposti nei giorni successivi."
+        ),
+    )
+    logger.info(f"Admin ha scartato posizioni {positions}")
