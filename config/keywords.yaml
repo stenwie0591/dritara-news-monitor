@@ -26,9 +26,9 @@ clusters:
     name: 'Tech & Innovazione'
     keywords:
       - { word: 'startup', weight: 2.0 }
-      - { word: 'innovazione', weight: 1.5 }
-      - { word: 'digitale', weight: 1.5 }
-      - { word: 'tecnologia', weight: 1.5 }
+      - { word: 'ecosistema dell innovazione', weight: 1.5 }
+      - { word: 'trasformazione digitale', weight: 1.5 }
+      - { word: 'tecnologie emergenti', weight: 1.5 }
       - { word: 'intelligenza artificiale', weight: 2.0 }
       - { word: 'blockchain', weight: 1.5 }
       - { word: 'cybersecurity', weight: 1.5 }
@@ -67,4 +67,4 @@ clusters:
       - { word: 'divario digitale', weight: 1.8 }
       - { word: 'donne nel tech', weight: 1.8 }
       - { word: 'talenti digitali', weight: 1.8 }
-      - { word: 'giovani e innovazione', weight: 1.5 }
+      - { word: 'imprenditoria giovanile', weight: 1.5 }

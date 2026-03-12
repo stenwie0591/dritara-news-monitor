@@ -11,7 +11,25 @@ from src.models import KeywordConfig
 # ── Keyword che richiedono contesto rafforzato ─────────────────
 # Vengono accettate solo se appaiono con almeno una keyword
 # dello stesso cluster nello stesso campo (titolo o excerpt).
-CONTEXT_REQUIRED = {"stem", "ai", "lavoro", "ricerca", "università"}
+CONTEXT_REQUIRED = {
+    # Cluster B — generiche, richiedono contesto tech
+    "startup",
+    "pnrr",
+    "automazione",
+    "brevetto",
+    "spin-off",
+    "smart city",
+    "fondi europei",
+    # Cluster C — generiche, richiedono contesto lavoro digitale
+    "fuga dei cervelli",
+    "talenti digitali",
+    "stem",
+    "brain drain",
+    # Originali
+    "ai",
+    "ricerca",
+    "università",
+}
 
 
 # ── Struttura risultato scoring ────────────────────────────────
