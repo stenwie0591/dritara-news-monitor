@@ -10,7 +10,7 @@ from src.models import KeywordConfig
 
 # ── Keyword che richiedono contesto rafforzato ─────────────────
 # Vengono accettate solo se appaiono con almeno una keyword
-# dello stesso cluster nello stesso campo (titolo o excerpt).
+# STANDALONE dello stesso cluster nello stesso testo.
 CONTEXT_REQUIRED = {
     # Cluster B — generiche, richiedono contesto tech
     "startup",
@@ -31,6 +31,51 @@ CONTEXT_REQUIRED = {
     "università",
 }
 
+# ── Blacklist — termini che segnalano cronaca non pertinente ───
+# Se una keyword tech appare in un articolo con questi termini,
+# lo score viene azzerato e l'articolo scartato.
+BLACKLIST = {
+    "arresto",
+    "arrestato",
+    "arrestati",
+    "sequestro",
+    "sequestrato",
+    "incidente",
+    "incidenti",
+    "sciopero",
+    "scioperi",
+    "delibera comunale",
+    "consiglio regionale",
+    "inaugurazione",
+    "sagra",
+    "traffico",
+    "meteo",
+    "omicidio",
+    "omicidi",
+    "rapina",
+    "rapine",
+    "camorra",
+    "mafia",
+    "ndrangheta",
+}
+
+# ── Boilerplate da rimuovere dagli excerpt ─────────────────────
+# Pattern ricorrenti nei feed che inquinano il testo con nomi di testate.
+BOILERPLATE_PATTERNS = [
+    re.compile(r"^Il Quotidiano del Sud\s+", re.IGNORECASE),
+    re.compile(r"\s+Il Quotidiano del Sud\s*\.\s*$", re.IGNORECASE),
+    re.compile(r"^Corriere della Calabria\s+", re.IGNORECASE),
+    re.compile(r"\[&#8230;\].*$"),  # tronca il suffisso RSS tipico
+    re.compile(r"\[…\].*$"),
+]
+
+# ── Moltiplicatore territoriale ────────────────────────────────
+# Applicato quando Cluster A e Cluster B co-occorrono nello stesso articolo.
+TERRITORIAL_BOOST = 1.5
+
+# ── Finestra proximity per CONTEXT_REQUIRED ────────────────────
+PROXIMITY_WINDOW = 20  # parole
+
 
 # ── Struttura risultato scoring ────────────────────────────────
 @dataclass
@@ -46,14 +91,20 @@ class Scorer:
     """
     Calcola lo score di un articolo basandosi su keyword e livello fonte.
 
-    Formula:
+    Formula base:
         score = (score_titolo × 2.0) + (score_excerpt × 1.0) + bonus_fonte
+
+    Regole avanzate:
+        - Territorial boost × 1.5 se Cluster A e Cluster B co-occorrono
+        - CONTEXT_REQUIRED: accettate solo se una keyword STANDALONE
+          dello stesso cluster appare entro PROXIMITY_WINDOW parole
+        - Blacklist: articolo scartato se contiene termini di cronaca non pertinente
 
     Sezioni:
         section1 — Cluster A AND (Cluster B OR Cluster C)
-        section2 — Cluster B OR Cluster C  (senza A)
+        section2 — Cluster B OR Cluster C (senza A)
         section3 — solo Cluster A
-        discarded — nessun cluster
+        discarded — nessun cluster o blacklist attivata
     """
 
     SOURCE_BONUS = {1: 0.5, 2: 0.0, 3: 1.0}
@@ -62,7 +113,9 @@ class Scorer:
 
     def __init__(self, keywords: list[KeywordConfig]):
         self._patterns: dict[str, list[tuple]] = {"A": [], "B": [], "C": []}
+        self._blacklist_patterns: list[re.Pattern] = []
         self._compile(keywords)
+        self._compile_blacklist()
         logger.info(
             f"Scorer inizializzato — "
             f"A:{len(self._patterns['A'])} "
@@ -76,29 +129,95 @@ class Scorer:
             pattern = re.compile(r"\b" + re.escape(kw.keyword) + r"\b", re.IGNORECASE)
             self._patterns[kw.cluster].append((pattern, kw.weight, kw.keyword))
 
+    def _compile_blacklist(self) -> None:
+        """Pre-compila i pattern della blacklist."""
+        for term in BLACKLIST:
+            self._blacklist_patterns.append(
+                re.compile(r"\b" + re.escape(term) + r"\b", re.IGNORECASE)
+            )
+
+    def _clean_excerpt(self, excerpt: str) -> str:
+        """Rimuove boilerplate ricorrenti dall'excerpt."""
+        for pattern in BOILERPLATE_PATTERNS:
+            excerpt = pattern.sub("", excerpt)
+        return excerpt.strip()
+
+    def _has_blacklist(self, text: str) -> Optional[str]:
+        """
+        Controlla se il testo contiene termini blacklist.
+        Ritorna il termine trovato, o None se pulito.
+        """
+        for pattern in self._blacklist_patterns:
+            m = pattern.search(text)
+            if m:
+                return m.group(0)
+        return None
+
+    def _check_proximity(self, text: str, context_kw: str, cluster: str) -> bool:
+        """
+        Verifica se una keyword CONTEXT_REQUIRED appare entro PROXIMITY_WINDOW
+        parole da una keyword STANDALONE dello stesso cluster.
+        """
+        words = text.lower().split()
+        # Trova le posizioni della keyword ambigua
+        context_positions = []
+        ctx_pattern = re.compile(r"\b" + re.escape(context_kw) + r"\b", re.IGNORECASE)
+        for i, w in enumerate(words):
+            if ctx_pattern.search(w):
+                context_positions.append(i)
+
+        if not context_positions:
+            return False
+
+        # Trova le posizioni delle keyword STANDALONE dello stesso cluster
+        standalone_positions = []
+        for pattern, _, word in self._patterns[cluster]:
+            if word not in CONTEXT_REQUIRED:
+                for i, w in enumerate(words):
+                    if pattern.search(w):
+                        standalone_positions.append(i)
+
+        if not standalone_positions:
+            return False
+
+        # Controlla se almeno una coppia è entro la finestra
+        for cp in context_positions:
+            for sp in standalone_positions:
+                if abs(cp - sp) <= PROXIMITY_WINDOW:
+                    return True
+
+        return False
+
     def _match_text(self, text: str, cluster: str) -> tuple[float, list[str]]:
         """
         Trova le keyword di un cluster nel testo.
-        Le keyword in CONTEXT_REQUIRED vengono accettate solo
-        se almeno un'altra keyword dello stesso cluster è presente.
+        Le keyword CONTEXT_REQUIRED vengono accettate solo se:
+        - almeno una keyword STANDALONE dello stesso cluster è presente nel testo
+        - E appare entro PROXIMITY_WINDOW parole (proximity check)
         Ritorna (score_parziale, lista_keyword_trovate).
         """
-        # Prima passata: trova tutte le keyword senza filtri
         raw_found = []
         for pattern, weight, word in self._patterns[cluster]:
             if pattern.search(text):
                 raw_found.append((word, weight))
 
-        # Keyword non ambigue trovate
         definite = [(w, wt) for w, wt in raw_found if w not in CONTEXT_REQUIRED]
         ambiguous = [(w, wt) for w, wt in raw_found if w in CONTEXT_REQUIRED]
 
-        # Le keyword ambigue sono accettate solo se ci sono anche keyword definite
+        # Le keyword ambigue richiedono:
+        # 1. almeno una keyword definite presente
+        # 2. proximity check entro PROXIMITY_WINDOW parole
+        accepted_ambiguous = []
         if definite:
-            accepted = definite + ambiguous
-        else:
-            accepted = definite  # scarta le ambigue se sono sole
+            for w, wt in ambiguous:
+                if self._check_proximity(text, w, cluster):
+                    accepted_ambiguous.append((w, wt))
+                else:
+                    logger.debug(
+                        f"CONTEXT_REQUIRED '{w}' scartata: nessuna keyword entro {PROXIMITY_WINDOW} parole"
+                    )
 
+        accepted = definite + accepted_ambiguous
         score = sum(wt for _, wt in accepted)
         found = [w for w, _ in accepted]
         return score, found
@@ -112,12 +231,24 @@ class Scorer:
         """Calcola lo score completo di un articolo."""
 
         title = title or ""
-        excerpt = excerpt or ""
+        excerpt = self._clean_excerpt(excerpt or "")
         result = ScoreResult()
         all_matches = []
 
         detail = {}
         has_cluster = {"A": False, "B": False, "C": False}
+
+        # ── Blacklist check ────────────────────────────────────
+        full_text = f"{title} {excerpt}"
+        blacklisted = self._has_blacklist(full_text)
+        if blacklisted:
+            logger.debug(f"Blacklist '{blacklisted}': {title[:60]}")
+            detail["blacklisted"] = blacklisted
+            detail["total"] = 0.0
+            result.score = 0.0
+            result.section = "discarded"
+            result.score_detail = detail
+            return result
 
         for cluster in ("A", "B", "C"):
             t_score, t_found = self._match_text(title, cluster)
@@ -140,8 +271,20 @@ class Scorer:
         detail["source_bonus"] = bonus
         detail["feed_level"] = feed_level
 
-        # ── Score totale ───────────────────────────────────────
+        # ── Score base ─────────────────────────────────────────
         base_score = sum(detail[f"cluster_{c}_score"] for c in ("A", "B", "C"))
+
+        # ── Territorial boost ──────────────────────────────────
+        # Applicato se Cluster A e Cluster B co-occorrono
+        territorial_boost_applied = False
+        if has_cluster["A"] and has_cluster["B"]:
+            base_score = round(base_score * TERRITORIAL_BOOST, 3)
+            territorial_boost_applied = True
+            logger.debug(
+                f"Territorial boost ×{TERRITORIAL_BOOST} applicato: {title[:60]}"
+            )
+
+        detail["territorial_boost"] = territorial_boost_applied
         total = round(base_score + bonus, 3)
         detail["total"] = total
 
@@ -150,7 +293,6 @@ class Scorer:
         has_B = has_cluster["B"]
         has_C = has_cluster["C"]
 
-        # Soglia minima per section1
         SECTION1_MIN_SCORE = 8.0
 
         # Feed locali (livello 3): il cluster B deve essere nel titolo
