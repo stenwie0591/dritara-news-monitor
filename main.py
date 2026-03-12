@@ -4,12 +4,31 @@ Avvia in parallelo:
   - Bot Telegram (long polling — ascolta comandi admin)
   - Scheduler (fetch giornaliero + pubblicazione oraria)
 """
+
 import asyncio
+import sys
 
 from loguru import logger
 
 from src.bot import run_bot
+from src.healthcheck import run_healthcheck
 from src.scheduler import build_scheduler
+
+# ── Logging ────────────────────────────────────────────────────
+logger.remove()  # rimuove handler di default
+logger.add(
+    sys.stderr,
+    level="INFO",
+    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {name}:{function}:{line} - {message}",
+)
+logger.add(
+    "logs/monitor.log",
+    level="DEBUG",
+    rotation="10 MB",  # nuovo file ogni 10 MB
+    retention="30 days",  # mantieni ultimi 30 giorni
+    compression="zip",  # comprimi i vecchi file
+    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {name}:{function}:{line} - {message}",
+)
 
 
 async def main() -> None:
@@ -23,9 +42,12 @@ async def main() -> None:
         logger.info(f"  {job.name}")
 
     # Avvia bot in long polling (blocca qui)
+# Avvia health check server
+    await run_healthcheck()
+
+    # Avvia bot in long polling (blocca qui)
     try:
-        await run_bot()
-    except (KeyboardInterrupt, SystemExit):
+        await run_bot()    except (KeyboardInterrupt, SystemExit):
         logger.info("Interruzione ricevuta")
     finally:
         scheduler.shutdown()

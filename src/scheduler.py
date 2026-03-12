@@ -100,6 +100,11 @@ async def job_fetch_and_notify() -> None:
         section1.sort(key=lambda x: x["score"], reverse=True)
         await notify_admin(section1, today)
 
+        # Alert immediato per feed con errori critici
+        from src.sender_telegram import alert_feed_errors
+
+        await alert_feed_errors(errors)
+
     except Exception as e:
         logger.error(f"Errore job fetch: {e}")
     finally:
@@ -121,6 +126,31 @@ async def job_publish(hour: int) -> None:
         logger.info(f"Pubblicato alle {hour}:00: {article['title'][:60]}")
     else:
         logger.error(f"Errore pubblicazione alle {hour}:00")
+
+
+# ── Recovery job saltati ───────────────────────────────────────
+async def job_startup_recovery() -> None:
+    """
+    Eseguito all'avvio: se il fetch di oggi non è ancora stato fatto
+    (nessun articolo con digest_date = oggi), lo lancia immediatamente.
+    """
+    session = next(get_session())
+    try:
+        from sqlmodel import select
+
+        today = date.today()
+        existing = session.exec(
+            select(Article).where(Article.digest_date == today).limit(1)
+        ).first()
+        if not existing:
+            logger.warning("Recovery: fetch di oggi non trovato — rilancio immediato")
+            await job_fetch_and_notify()
+        else:
+            logger.info("Recovery: fetch di oggi già presente — nessuna azione")
+    except Exception as e:
+        logger.error(f"Errore recovery startup: {e}")
+    finally:
+        session.close()
 
 
 # ── Setup scheduler ────────────────────────────────────────────
@@ -155,5 +185,14 @@ def build_scheduler() -> AsyncIOScheduler:
             args=[hour],
             replace_existing=True,
         )
+
+        # Recovery all'avvio — lancia fetch se oggi non è ancora stato fatto
+    scheduler.add_job(
+        job_startup_recovery,
+        "date",  # eseguito una sola volta, subito
+        id="startup_recovery",
+        name="Recovery job saltati",
+        replace_existing=True,
+    )
 
     return scheduler

@@ -360,3 +360,36 @@ def discard_articles(positions: list[int], digest_date: date) -> int:
     session.close()
     logger.info(f"Scartati manualmente {discarded} articoli alle posizioni {positions}")
     return discarded
+
+
+async def alert_feed_errors(feed_errors: list[dict]) -> None:
+    """
+    Invia alert immediato all'admin per feed con errori critici
+    (consecutive_errors >= 3).
+    """
+    session = next(get_session())
+    critical = []
+
+    for fe in feed_errors:
+        from sqlmodel import select
+
+        from src.models import FeedSource
+
+        source = session.exec(
+            select(FeedSource).where(FeedSource.id == fe["source_id"])
+        ).first()
+        if source and source.consecutive_errors >= 3:
+            critical.append(
+                f"• *{source.name}* — {source.consecutive_errors} errori consecutivi\n"
+                f"  `{fe['error'][:80]}`"
+            )
+
+    session.close()
+
+    if not critical:
+        return
+
+    lines = ["⚠️ *DRITARA — Alert feed critici*\n"]
+    lines.extend(critical)
+    await _send(ADMIN_ID, "\n".join(lines))
+    logger.warning(f"Alert inviato per {len(critical)} feed critici")
