@@ -11,7 +11,7 @@ async def handle_health(request):
     return web.Response(text="OK", status=200)
 
 
-async def run_healthcheck(host: str = "0.0.0.0", port: int = 8080) -> None:
+async def run_healthcheck(host: str = "0.0.0.0", port: int = 8088) -> None:
     app = web.Application()
     app.router.add_get("/health", handle_health)
     runner = web.AppRunner(app)
