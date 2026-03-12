@@ -8,7 +8,9 @@ Comandi supportati:
 
 import asyncio
 import os
+from collections import defaultdict
 from datetime import date
+from time import time
 
 import httpx
 from dotenv import load_dotenv
@@ -20,6 +22,20 @@ from src.sender_telegram import (
     _send,
     approve_articles,
 )
+
+# ── Rate limiting ──────────────────────────────────────────────
+# Max 1 comando ogni RATE_LIMIT_SECONDS per evitare spam
+RATE_LIMIT_SECONDS = 5
+_last_command_time: dict = defaultdict(float)
+
+
+def _is_rate_limited(chat_id: int) -> bool:
+    now = time()
+    if now - _last_command_time[chat_id] < RATE_LIMIT_SECONDS:
+        return True
+    _last_command_time[chat_id] = now
+    return False
+
 
 load_dotenv()
 
@@ -62,6 +78,9 @@ async def _handle(update: dict) -> None:
     text = msg.get("text", "").strip()
 
     if chat_id != ADMIN_ID:
+        return
+
+    if _is_rate_limited(chat_id):
         return
 
     if text == "/start":

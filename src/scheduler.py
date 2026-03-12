@@ -25,6 +25,7 @@ from src.sender_telegram import (
     PUBLISH_HOURS,
     get_next_to_publish,
     mark_published,
+    mark_publishing,
     notify_admin,
     publish_article,
 )
@@ -120,6 +121,7 @@ async def job_publish(hour: int) -> None:
         logger.info(f"Nessun articolo approvato per le {hour}:00")
         return
 
+    mark_publishing(article["queue_id"])
     success = await publish_article(article)
     if success:
         mark_published(article["queue_id"])

@@ -335,6 +335,17 @@ def mark_published(queue_id: int) -> None:
     session.close()
 
 
+def mark_publishing(queue_id: int) -> None:
+    """Segna l'articolo come 'publishing' prima dell'invio — previene doppio invio."""
+    session = next(get_session())
+    q = session.get(PublishQueue, queue_id)
+    if q:
+        q.status = "publishing"
+        session.add(q)
+        session.commit()
+    session.close()
+
+
 def discard_articles(positions: list[int], digest_date: date) -> int:
     """
     Scarta manualmente gli articoli nelle posizioni indicate.
@@ -371,8 +382,6 @@ async def alert_feed_errors(feed_errors: list[dict]) -> None:
     critical = []
 
     for fe in feed_errors:
-        from sqlmodel import select
-
         from src.models import FeedSource
 
         source = session.exec(
