@@ -1,7 +1,9 @@
-from datetime import datetime, date
-from typing import Optional
-from sqlmodel import SQLModel, Field
 import json
+from datetime import date, datetime
+from typing import Optional
+
+from sqlalchemy import Index
+from sqlmodel import Field, SQLModel
 
 
 class FeedSource(SQLModel, table=True):
@@ -10,9 +12,9 @@ class FeedSource(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     url: str = Field(unique=True)
-    level: int = Field(ge=1, le=3)           # 1, 2 o 3
-    category: str                             # tech | generalista | locale
-    region: Optional[str] = None             # calabria | campania | puglia | sicilia | None
+    level: int = Field(ge=1, le=3)  # 1, 2 o 3
+    category: str  # tech | generalista | locale
+    region: Optional[str] = None  # calabria | campania | puglia | sicilia | None
     active: bool = Field(default=True)
     last_fetched_at: Optional[datetime] = None
     last_success_at: Optional[datetime] = None
@@ -23,7 +25,13 @@ class FeedSource(SQLModel, table=True):
 class Article(SQLModel, table=True):
     """Articolo raccolto da un feed, con score e sezione assegnata."""
 
-    id: str = Field(primary_key=True)        # SHA-256 dell'URL
+    __table_args__ = (
+        Index("ix_article_digest_date", "digest_date"),
+        Index("ix_article_section", "section"),
+        Index("ix_article_score", "score"),
+    )
+
+    id: str = Field(primary_key=True)  # SHA-256 dell'URL
     feed_source_id: int = Field(foreign_key="feedsource.id")
     feed_name: str
     feed_level: int
@@ -92,7 +100,7 @@ class KeywordConfig(SQLModel, table=True):
     """Catalogo keyword attive con cluster e peso."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    cluster: str = Field(index=True)         # A | B | C
+    cluster: str = Field(index=True)  # A | B | C
     keyword: str
     weight: float
     active: bool = Field(default=True)
@@ -101,11 +109,18 @@ class KeywordConfig(SQLModel, table=True):
 
 class PublishQueue(SQLModel, table=True):
     """Coda di pubblicazione articoli approvati dall'admin."""
-    id:           Optional[int]      = Field(default=None, primary_key=True)
-    article_id:   str                = Field(foreign_key="article.id")
-    digest_date:  date               = Field(index=True)
-    position:     int                = Field()          # numero mostrato all'admin
-    status:        str                = Field(default="pending")  # pending/approved/published/deferred
-    deferred_count:  int               = Field(default=0)
-    scheduled_hour:  Optional[int]     = Field(default=None)
+
+    __table_args__ = (
+        Index("ix_publishqueue_status", "status"),
+        Index("ix_publishqueue_status_date", "status", "digest_date"),
+        Index("ix_publishqueue_published_at", "published_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    article_id: str = Field(foreign_key="article.id")
+    digest_date: date = Field(index=True)
+    position: int = Field()
+    status: str = Field(default="pending")
+    deferred_count: int = Field(default=0)
+    scheduled_hour: Optional[int] = Field(default=None)
     published_at: Optional[datetime] = Field(default=None)

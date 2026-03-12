@@ -1,10 +1,7 @@
 import hashlib
-from typing import Optional
 
-from rapidfuzz import fuzz
 from loguru import logger
-
-from src.models import Article
+from rapidfuzz import fuzz
 
 
 # ── ID articolo ────────────────────────────────────────────────
@@ -13,12 +10,18 @@ def make_article_id(url: str) -> str:
     return hashlib.sha256(url.strip().encode()).hexdigest()
 
 
+def _title_hash(title: str) -> str:
+    """Hash MD5 del titolo normalizzato — per dedup esatto O(1)."""
+    return hashlib.md5(_normalize_title(title).encode()).hexdigest()
+
+
 # ── Deduplicatore ──────────────────────────────────────────────
 class Deduplicator:
     """
-    Elimina articoli duplicati usando due strategie:
-    1. URL esatto (SHA-256 — istantaneo)
-    2. Title fingerprint (rapidfuzz similarità ≥ soglia)
+    Elimina articoli duplicati usando tre strategie in cascata:
+    1. URL esatto (SHA-256 — O(1))
+    2. Title hash esatto (MD5 normalizzato — O(1))
+    3. Title fingerprint fuzzy (rapidfuzz ≥ soglia — solo se 1 e 2 falliscono)
 
     Gestisce duplicati cross-source: stesso articolo
     ripreso da ANSA, AGI e Adnkronos viene contato una volta sola.
@@ -27,11 +30,13 @@ class Deduplicator:
     def __init__(self, similarity_threshold: float = 0.85):
         self.threshold = similarity_threshold
         self._seen_ids: set[str] = set()
+        self._seen_title_hashes: set[str] = set()
         self._seen_titles: list[str] = []
 
     def reset(self) -> None:
         """Resetta lo stato per un nuovo ciclo di fetch."""
         self._seen_ids.clear()
+        self._seen_title_hashes.clear()
         self._seen_titles.clear()
 
     def is_duplicate(self, article_id: str, title: str) -> tuple[bool, str]:
@@ -39,11 +44,16 @@ class Deduplicator:
         Controlla se un articolo è duplicato.
         Ritorna (is_dup, motivo).
         """
-        # 1. Controllo URL esatto
+        # 1. Controllo URL esatto — O(1)
         if article_id in self._seen_ids:
             return True, "url_exact"
 
-        # 2. Controllo title fingerprint
+        # 2. Controllo title hash esatto — O(1)
+        th = _title_hash(title)
+        if th in self._seen_title_hashes:
+            return True, "title_exact"
+
+        # 3. Controllo title fingerprint fuzzy — O(n), solo se necessario
         title_clean = _normalize_title(title)
         for seen_title in self._seen_titles:
             similarity = fuzz.ratio(title_clean, seen_title)
@@ -55,6 +65,7 @@ class Deduplicator:
     def register(self, article_id: str, title: str) -> None:
         """Registra un articolo come visto."""
         self._seen_ids.add(article_id)
+        self._seen_title_hashes.add(_title_hash(title))
         self._seen_titles.append(_normalize_title(title))
 
     def filter(self, articles: list[dict]) -> list[dict]:
@@ -79,7 +90,10 @@ class Deduplicator:
                 unique.append(art)
 
         if duplicates:
-            logger.info(f"Deduplicazione: {len(articles)} articoli → {len(unique)} unici ({duplicates} duplicati rimossi)")
+            logger.info(
+                f"Deduplicazione: {len(articles)} articoli → {len(unique)} unici "
+                f"({duplicates} duplicati rimossi)"
+            )
 
         return unique
 
