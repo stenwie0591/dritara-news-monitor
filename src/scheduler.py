@@ -8,20 +8,19 @@ Flusso giornaliero:
   18:00 — pubblica articolo approvato (se presente)
   22:00 — pubblica articolo approvato (se presente)
 """
-import asyncio
+
 from datetime import date
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
-from sqlmodel import select
 
 from src.database import get_session
 from src.deduplicator import Deduplicator
 from src.fetcher import fetch_all_feeds
 from src.models import Article
-from src.scorer import build_scorer
 from src.monitor import send_heartbeat
+from src.scorer import build_scorer
 from src.sender_telegram import (
     PUBLISH_HOURS,
     get_next_to_publish,
@@ -59,6 +58,11 @@ async def job_fetch_and_notify() -> None:
                 feed_level=a.get("feed_level", 2),
             )
             if scored.section != "discarded":
+                # Salta se l'articolo è già nel DB
+                from src.database import article_exists
+
+                if article_exists(session, a["id"]):
+                    continue
                 article = Article(
                     id=a["id"],
                     title=a["title"],
@@ -78,14 +82,16 @@ async def job_fetch_and_notify() -> None:
                 saved += 1
 
                 if scored.section == "section1":
-                    section1.append({
-                        "id": a["id"],
-                        "title": a["title"],
-                        "excerpt": a.get("excerpt", ""),
-                        "feed_name": a["feed_name"],
-                        "url": a["url"],
-                        "score": scored.score,
-                    })
+                    section1.append(
+                        {
+                            "id": a["id"],
+                            "title": a["title"],
+                            "excerpt": a.get("excerpt", ""),
+                            "feed_name": a["feed_name"],
+                            "url": a["url"],
+                            "score": scored.score,
+                        }
+                    )
 
         session.commit()
         logger.info(f"Salvati {saved} articoli — Section1: {len(section1)}")
