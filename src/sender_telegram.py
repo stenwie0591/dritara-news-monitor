@@ -1,5 +1,6 @@
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from difflib import SequenceMatcher
 from typing import Optional
 
 import httpx
@@ -23,6 +24,25 @@ BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 PUBLISH_HOURS = [18, 13, 9, 22]
 MAX_DAILY = 4
 MAX_DEFERRALS = 4
+
+
+def _is_already_published(title: str, session, days: int = 7) -> bool:
+    """Controlla se un articolo simile è già stato pubblicato negli ultimi N giorni."""
+    cutoff = date.today() - timedelta(days=days)
+    published = session.exec(
+        select(PublishQueue).where(
+            PublishQueue.status == "published",
+            PublishQueue.published_at >= datetime.combine(cutoff, datetime.min.time()),
+        )
+    ).all()
+    for q in published:
+        article = session.get(Article, q.article_id)
+        if article:
+            ratio = SequenceMatcher(None, title.lower(), article.title.lower()).ratio()
+            if ratio >= 0.85:
+                logger.debug(f"Già pubblicato ({ratio:.0%}): {title[:60]}")
+                return True
+    return False
 
 
 # ── API Telegram ───────────────────────────────────────────────
@@ -83,6 +103,11 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
                 f"*{i}.* [{a['title']}]({a['url']})\n"
                 f"   _{a['feed_name']} · score {a['score']:.1f} · rimandato {count}x_\n"
             )
+
+    # Filtra nuovi già pubblicati di recente
+    session = next(get_session())
+    articles = [a for a in articles if not _is_already_published(a["title"], session)]
+    session.close()
 
     # Poi i nuovi
     if articles:
