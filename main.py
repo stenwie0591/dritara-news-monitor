@@ -3,6 +3,7 @@ Dritara News Monitor — entry point principale.
 Avvia in parallelo:
   - Bot Telegram (long polling — ascolta comandi admin)
   - Scheduler (fetch giornaliero + pubblicazione oraria)
+  - Health check server (GET /health per monitoraggio esterno)
 """
 
 import asyncio
@@ -24,9 +25,9 @@ logger.add(
 logger.add(
     "logs/monitor.log",
     level="DEBUG",
-    rotation="10 MB",  # nuovo file ogni 10 MB
-    retention="30 days",  # mantieni ultimi 30 giorni
-    compression="zip",  # comprimi i vecchi file
+    rotation="10 MB",
+    retention="30 days",
+    compression="zip",
     format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {name}:{function}:{line} - {message}",
 )
 
@@ -41,13 +42,13 @@ async def main() -> None:
     for job in scheduler.get_jobs():
         logger.info(f"  {job.name}")
 
-    # Avvia bot in long polling (blocca qui)
-# Avvia health check server
+    # Avvia health check server
     await run_healthcheck()
 
     # Avvia bot in long polling (blocca qui)
     try:
-        await run_bot()    except (KeyboardInterrupt, SystemExit):
+        await run_bot()
+    except (KeyboardInterrupt, SystemExit):
         logger.info("Interruzione ricevuta")
     finally:
         scheduler.shutdown()
