@@ -19,3 +19,4 @@ async def run_healthcheck(host: str = "0.0.0.0", port: int = 8080) -> None:
     site = web.TCPSite(runner, host, port)
     await site.start()
     logger.info(f"Health check server attivo su {host}:{port}/health")
+    # Non blocca — ritorna subito lasciando il server in background
