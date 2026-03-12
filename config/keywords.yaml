@@ -2,7 +2,7 @@ clusters:
   A:
     name: 'Geo Sud'
     keywords:
-      - { word: 'sud', weight: 1.5 }
+      - { word: 'sud italia', weight: 1.5 }
       - { word: 'mezzogiorno', weight: 1.5 }
       - { word: 'calabria', weight: 2.0 }
       - { word: 'campania', weight: 2.0 }
@@ -13,7 +13,7 @@ clusters:
       - { word: 'sardegna', weight: 1.5 }
       - { word: 'napoli', weight: 1.8 }
       - { word: 'palermo', weight: 1.8 }
-      - { word: 'reggio', weight: 1.5 }
+      - { word: 'reggio calabria', weight: 1.5 }
       - { word: 'cosenza', weight: 2.0 }
       - { word: 'catanzaro', weight: 1.8 }
       - { word: 'bari', weight: 1.8 }
