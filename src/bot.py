@@ -1,11 +1,14 @@
 """
 Bot handler — resta in ascolto dei comandi dell'admin via long polling.
 Comandi supportati:
-  /start   — messaggio di benvenuto
-  /ok 1 3  — approva gli articoli nelle posizioni indicate
+  /start    — messaggio di benvenuto
+  /ok 1 3   — approva gli articoli nelle posizioni indicate
   /scarta 2 4 — scarta articoli fuori tema
-  /status  — mostra lo stato della coda di oggi
-  /analisi — analisi keyword ultima settimana con suggerimenti
+  /status   — mostra lo stato della coda di oggi
+  /analisi  — analisi keyword ultima settimana con suggerimenti
+  /applica  — applica i suggerimenti keyword pendenti
+  /ignora   — scarta i suggerimenti keyword pendenti
+  /rollback — ripristina i pesi keyword all'ultima modifica
 """
 
 import asyncio
@@ -97,10 +100,10 @@ async def _handle(update: dict) -> None:
                 "• `/ok 1 3` — approva gli articoli nelle posizioni indicate\n"
                 "• `/scarta 2 4` — scarta articoli fuori tema\n"
                 "• `/status` — stato della coda di oggi\n"
-                "• `/analisi` — analisi keyword ultima settimana"
+                "• `/analisi` — analisi keyword ultima settimana\n"
+                "• `/rollback` — ripristina pesi keyword all'ultima modifica"
             ),
         )
-
     elif text.startswith("/ok"):
         await _handle_ok(text)
     elif text.startswith("/scarta"):
@@ -113,10 +116,12 @@ async def _handle(update: dict) -> None:
         await _handle_applica()
     elif text == "/ignora":
         await _handle_ignora()
+    elif text == "/rollback":
+        await _handle_rollback()
     else:
         await _send(
             ADMIN_ID,
-            "Comando non riconosciuto. Usa `/ok 1 3`, `/scarta 2 4`, `/status` o `/analisi`.",
+            "Comando non riconosciuto. Usa `/ok 1 3`, `/scarta 2 4`, `/status`, `/analisi` o `/rollback`.",
         )
 
 
@@ -201,6 +206,8 @@ async def _handle_status() -> None:
 
 
 async def _handle_scarta(text: str) -> None:
+    from src.sender_telegram import discard_articles
+
     parts = text.split()[1:]
 
     if not parts:
@@ -244,10 +251,10 @@ async def _handle_analisi() -> None:
     oggi = date.today()
     una_settimana_fa = oggi - timedelta(days=7)
 
-    # Recupera articoli approvati e scartati nell'ultima settimana
+    # Recupera articoli approvati (published + approved) e scartati nell'ultima settimana
     approvati_ids = session.exec(
         select(PublishQueue.article_id)
-        .where(PublishQueue.status == "published")
+        .where(PublishQueue.status.in_(["published", "approved"]))
         .where(PublishQueue.digest_date >= una_settimana_fa)
     ).all()
 
@@ -297,7 +304,6 @@ async def _handle_analisi() -> None:
     session.close()
 
     # Calcola tasso di approvazione per keyword
-    # (quante volte appare negli approvati vs totale apparizioni)
     tutte_le_kw = set(kw_approvati.keys()) | set(kw_scartati.keys())
     tassi: list = []
     for kw in tutte_le_kw:
@@ -338,6 +344,7 @@ async def _handle_analisi() -> None:
                     {
                         "tipo": "aumenta_peso",
                         "keyword": kw,
+                        "keyword_id": kw_db_map[kw].id,
                         "cluster": kw_db_map[kw].cluster,
                         "peso_attuale": peso_attuale,
                         "nuovo_peso": nuovo_peso,
@@ -354,6 +361,7 @@ async def _handle_analisi() -> None:
                     {
                         "tipo": "riduci_peso",
                         "keyword": kw,
+                        "keyword_id": kw_db_map[kw].id,
                         "cluster": kw_db_map[kw].cluster,
                         "peso_attuale": peso_attuale,
                         "nuovo_peso": nuovo_peso,
@@ -411,7 +419,7 @@ async def _handle_analisi() -> None:
 
 
 async def _handle_applica() -> None:
-    """Applica i suggerimenti keyword pendenti."""
+    """Applica i suggerimenti keyword pendenti e salva la history per rollback."""
     global _pending_suggestions
 
     if not _pending_suggestions:
@@ -423,7 +431,7 @@ async def _handle_applica() -> None:
     from sqlmodel import select
 
     from src.database import get_session
-    from src.models import KeywordConfig
+    from src.models import KeywordConfig, KeywordWeightHistory
 
     session = next(get_session())
     applicati = []
@@ -437,8 +445,23 @@ async def _handle_applica() -> None:
 
         if kw_row:
             vecchio = kw_row.weight
+
+            # Salva history prima di modificare
+            history = KeywordWeightHistory(
+                keyword_id=kw_row.id,
+                keyword=kw_row.keyword,
+                cluster=kw_row.cluster,
+                peso_precedente=vecchio,
+                peso_nuovo=s["nuovo_peso"],
+                motivo="analisi_automatica",
+                applicato=True,
+            )
+            session.add(history)
+
+            # Applica modifica
             kw_row.weight = s["nuovo_peso"]
             session.add(kw_row)
+
             applicati.append(f'  • "{s["keyword"]}": {vecchio} → {s["nuovo_peso"]}')
 
     session.commit()
@@ -455,7 +478,9 @@ async def _handle_applica() -> None:
     lines = [
         "✅ *Modifiche applicate:*\n",
         *applicati,
-        "\n_Le nuove soglie saranno attive dal prossimo fetch._",
+        "",
+        "_Le nuove soglie saranno attive dal prossimo fetch._",
+        "_Usa `/rollback` per annullare queste modifiche._",
     ]
     await _send(ADMIN_ID, "\n".join(lines))
     logger.info(f"Applicati {len(applicati)} aggiornamenti keyword")
@@ -475,3 +500,68 @@ async def _handle_ignora() -> None:
         ADMIN_ID, f"🚫 *{n} suggerimenti ignorati.* I pesi rimangono invariati."
     )
     logger.info("Suggerimenti keyword ignorati dall'admin")
+
+
+async def _handle_rollback() -> None:
+    """Ripristina i pesi keyword all'ultima sessione di modifiche."""
+    from sqlmodel import select
+
+    from src.database import get_session
+    from src.models import KeywordConfig, KeywordWeightHistory
+
+    session = next(get_session())
+
+    # Trova l'ultima sessione di modifiche (stesso minuto = stesso batch)
+    ultima = session.exec(
+        select(KeywordWeightHistory)
+        .where(KeywordWeightHistory.applicato == True)
+        .order_by(KeywordWeightHistory.modificato_at.desc())
+    ).first()
+
+    if not ultima:
+        await _send(ADMIN_ID, "⚠️ Nessuna modifica precedente da annullare.")
+        session.close()
+        return
+
+    # Prendi tutte le modifiche dello stesso batch (stessa sessione = stesso minuto)
+    batch_time = ultima.modificato_at.replace(second=0, microsecond=0)
+    batch = session.exec(
+        select(KeywordWeightHistory)
+        .where(KeywordWeightHistory.applicato == True)
+        .where(KeywordWeightHistory.modificato_at >= batch_time)
+    ).all()
+
+    ripristinati = []
+
+    for h in batch:
+        kw_row = session.exec(
+            select(KeywordConfig).where(KeywordConfig.id == h.keyword_id)
+        ).first()
+
+        if kw_row:
+            kw_row.weight = h.peso_precedente
+            session.add(kw_row)
+
+        # Marca la history come annullata
+        h.applicato = False
+        session.add(h)
+
+        ripristinati.append(
+            f'  • "{h.keyword}": {h.peso_nuovo} → {h.peso_precedente} _(ripristinato)_'
+        )
+
+    session.commit()
+    session.close()
+
+    if not ripristinati:
+        await _send(ADMIN_ID, "⚠️ Nessuna modifica da annullare.")
+        return
+
+    lines = [
+        "↩️ *Rollback completato:*\n",
+        *ripristinati,
+        "",
+        "_I pesi originali sono stati ripristinati._",
+    ]
+    await _send(ADMIN_ID, "\n".join(lines))
+    logger.info(f"Rollback eseguito — {len(ripristinati)} keyword ripristinate")

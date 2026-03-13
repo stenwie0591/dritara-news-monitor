@@ -124,3 +124,17 @@ class PublishQueue(SQLModel, table=True):
     deferred_count: int = Field(default=0)
     scheduled_hour: Optional[int] = Field(default=None)
     published_at: Optional[datetime] = Field(default=None)
+
+
+class KeywordWeightHistory(SQLModel, table=True):
+    """Storico delle modifiche ai pesi keyword — permette rollback."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    keyword_id: int = Field(foreign_key="keywordconfig.id")
+    keyword: str  # denormalizzato per leggibilità
+    cluster: str
+    peso_precedente: float
+    peso_nuovo: float
+    modificato_at: datetime = Field(default_factory=datetime.utcnow)
+    motivo: str = Field(default="analisi_automatica")  # analisi_automatica | manuale
+    applicato: bool = Field(default=True)  # False se rollback già eseguito
