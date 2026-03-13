@@ -94,6 +94,54 @@ async def job_fetch_and_notify() -> None:
                     )
 
         session.commit()
+
+        # Salva statistiche per feed
+        from src.models import FeedStats
+        from sqlmodel import select as sql_select
+
+        feed_fetched: dict = {}
+        feed_relevant: dict = {}
+
+        for a in articles_unique:
+            fid = a["feed_source_id"]
+            fname = a["feed_name"]
+            feed_fetched[fid] = (fname, feed_fetched.get(fid, (fname, 0))[1] + 1)
+
+        for a in articles_unique:
+            scored = scorer.score(
+                title=a["title"],
+                excerpt=a.get("excerpt", ""),
+                feed_level=a.get("feed_level", 2),
+            )
+            if scored.section != "discarded":
+                fid = a["feed_source_id"]
+                fname = a["feed_name"]
+                feed_relevant[fid] = (fname, feed_relevant.get(fid, (fname, 0))[1] + 1)
+
+        for fid, (fname, n_fetched) in feed_fetched.items():
+            _, n_relevant = feed_relevant.get(fid, (fname, 0))
+            existing_stat = session.exec(
+                sql_select(FeedStats)
+                .where(FeedStats.feed_source_id == fid)
+                .where(FeedStats.fetch_date == today)
+            ).first()
+            if existing_stat:
+                existing_stat.articles_fetched = n_fetched
+                existing_stat.articles_relevant = n_relevant
+                session.add(existing_stat)
+            else:
+                session.add(
+                    FeedStats(
+                        feed_source_id=fid,
+                        feed_name=fname,
+                        fetch_date=today,
+                        articles_fetched=n_fetched,
+                        articles_relevant=n_relevant,
+                    )
+                )
+
+        session.commit()
+        logger.info(f"FeedStats salvate per {len(feed_fetched)} feed")
         logger.info(f"Salvati {saved} articoli — Section1: {len(section1)}")
 
         # Notifica admin con articoli section1 ordinati per score

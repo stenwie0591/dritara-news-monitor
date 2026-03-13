@@ -138,3 +138,16 @@ class KeywordWeightHistory(SQLModel, table=True):
     modificato_at: datetime = Field(default_factory=datetime.utcnow)
     motivo: str = Field(default="analisi_automatica")  # analisi_automatica | manuale
     applicato: bool = Field(default=True)  # False se rollback già eseguito
+
+
+class FeedStats(SQLModel, table=True):
+    """Statistiche giornaliere per feed — usate per monitoring e heartbeat."""
+
+    __table_args__ = (Index("ix_feedstats_feed_date", "feed_source_id", "fetch_date"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    feed_source_id: int = Field(foreign_key="feedsource.id")
+    feed_name: str  # denormalizzato per leggibilità
+    fetch_date: date = Field(index=True)
+    articles_fetched: int = Field(default=0)
+    articles_relevant: int = Field(default=0)
