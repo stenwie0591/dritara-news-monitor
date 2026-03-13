@@ -44,6 +44,7 @@ feeds:
     level: 1
     category: tech
     region: null
+    active: false
   - name: Formiche
     url: https://formiche.net/feed/
     level: 1
