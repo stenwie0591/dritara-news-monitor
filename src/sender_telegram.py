@@ -1,5 +1,5 @@
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Optional
 
@@ -342,7 +342,7 @@ def mark_published(queue_id: int) -> None:
     q = session.get(PublishQueue, queue_id)
     if q:
         q.status = "published"
-        q.published_at = datetime.utcnow()
+        q.published_at = datetime.now(timezone.utc).replace(tzinfo=None)
         session.add(q)
         session.commit()
     session.close()
