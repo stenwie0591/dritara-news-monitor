@@ -17,6 +17,7 @@ from loguru import logger
 
 from src.database import get_session
 from src.deduplicator import Deduplicator
+from src.drive import upload_csv_giornaliero, upload_sqlite_backup
 from src.fetcher import fetch_all_feeds
 from src.models import Article
 from src.monitor import send_heartbeat
@@ -96,8 +97,9 @@ async def job_fetch_and_notify() -> None:
         session.commit()
 
         # Salva statistiche per feed
-        from src.models import FeedStats
         from sqlmodel import select as sql_select
+
+        from src.models import FeedStats
 
         feed_fetched: dict = {}
         feed_relevant: dict = {}
@@ -148,6 +150,35 @@ async def job_fetch_and_notify() -> None:
         section1.sort(key=lambda x: x["score"], reverse=True)
         await notify_admin(section1, today)
 
+        # Upload CSV giornaliero su Drive
+        from sqlmodel import select as sql_select_pq
+
+        from src.models import PublishQueue
+
+        all_relevant = session.exec(
+            sql_select_pq(Article).where(Article.digest_date == today)
+        ).all()
+
+        queue_today = session.exec(
+            sql_select_pq(PublishQueue).where(PublishQueue.digest_date == today)
+        ).all()
+        queue_status = {q.article_id: q.status for q in queue_today}
+
+        articles_for_csv = [
+            {
+                "title": a.title,
+                "url": a.url,
+                "feed_name": a.feed_name,
+                "section": a.section,
+                "score": round(a.score, 2),
+                "keyword_matches": a.get_keyword_matches(),
+                "status": queue_status.get(a.id, "pending"),
+            }
+            for a in all_relevant
+        ]
+
+        upload_csv_giornaliero(articles_for_csv, today)
+
         # Alert immediato per feed con errori critici
         from src.sender_telegram import alert_feed_errors
 
@@ -182,8 +213,6 @@ async def job_recover_orphan_publishing() -> None:
     """
     Eseguito all'avvio: riporta a 'approved' qualsiasi articolo
     rimasto bloccato in stato 'publishing' a causa di un crash.
-    Questo può succedere se il servizio si riavvia tra mark_publishing()
-    e mark_published().
     """
     from sqlmodel import select
 
@@ -210,7 +239,6 @@ async def job_recover_orphan_publishing() -> None:
         session.commit()
         logger.info(f"Recovery publishing: {len(orfani)} articoli ripristinati")
 
-        # Notifica admin
         import os
 
         from src.sender_telegram import _send
@@ -240,10 +268,8 @@ async def job_startup_recovery() -> None:
     (nessun articolo con digest_date = oggi), lo lancia immediatamente.
     Esegue anche il recovery degli stati publishing orfani.
     """
-    # Prima: ripristina eventuali stati publishing orfani
     await job_recover_orphan_publishing()
 
-    # Poi: verifica se il fetch di oggi è già stato fatto
     session = next(get_session())
     try:
         from sqlmodel import select
@@ -280,14 +306,12 @@ async def job_cleanup_db() -> None:
         cutoff = date.today() - timedelta(days=90)
         logger.info(f"Pulizia DB: rimozione articoli antecedenti al {cutoff}")
 
-        # Prima cancella le voci in PublishQueue (FK su Article)
         old_queue = session.exec(
             select(PublishQueue).where(PublishQueue.digest_date < cutoff)
         ).all()
         for q in old_queue:
             session.delete(q)
 
-        # Poi cancella gli articoli
         old_articles = session.exec(
             select(Article).where(Article.digest_date < cutoff)
         ).all()
@@ -302,6 +326,20 @@ async def job_cleanup_db() -> None:
         logger.error(f"Errore pulizia DB: {e}")
     finally:
         session.close()
+
+
+# ── Job: backup SQLite su Drive ────────────────────────────────
+async def job_backup_drive() -> None:
+    """Backup SQLite su Drive — eseguito ogni domenica alle 02:30."""
+    from pathlib import Path
+
+    logger.info("=== JOB: backup SQLite su Drive ===")
+    db_path = Path("data/dritara.db")
+    file_id = upload_sqlite_backup(db_path, date.today())
+    if file_id:
+        logger.info(f"Backup Drive completato: {file_id}")
+    else:
+        logger.error("Backup Drive fallito")
 
 
 # ── Setup scheduler ────────────────────────────────────────────
@@ -335,6 +373,15 @@ def build_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # Backup SQLite ogni domenica notte alle 02:30
+    scheduler.add_job(
+        job_backup_drive,
+        CronTrigger(day_of_week="sun", hour=2, minute=30, timezone="Europe/Rome"),
+        id="backup_drive",
+        name="Backup SQLite su Drive",
+        replace_existing=True,
+    )
+
     # Pubblicazione agli orari prestabiliti
     for hour in PUBLISH_HOURS:
         scheduler.add_job(
@@ -349,7 +396,7 @@ def build_scheduler() -> AsyncIOScheduler:
     # Recovery all'avvio — publishing orfani + fetch mancato
     scheduler.add_job(
         job_startup_recovery,
-        "date",  # eseguito una sola volta, subito
+        "date",
         id="startup_recovery",
         name="Recovery job saltati",
         replace_existing=True,
