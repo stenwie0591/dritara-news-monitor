@@ -32,6 +32,43 @@ from src.sender_telegram import (
 )
 
 
+def _promote_fallback_section1(articles: list, max_promote: int = 2) -> None:
+    """
+    Se section1 è vuota, promuove i migliori articoli section2.
+    Priorità: territorial_boost=True, poi score puro.
+    Massimo max_promote articoli promossi.
+    """
+    s2 = [a for a in articles if a.section == "section2"]
+    if not s2:
+        return
+
+    # Priorità 1: territorial boost applicato (A+B già presenti)
+    import ast
+
+    with_boost = []
+    for a in s2:
+        try:
+            detail = (
+                ast.literal_eval(a.score_detail)
+                if isinstance(a.score_detail, str)
+                else a.score_detail
+            )
+            if detail.get("territorial_boost"):
+                with_boost.append(a)
+        except Exception:
+            pass
+
+    candidates = sorted(with_boost, key=lambda x: x.score, reverse=True)
+
+    # Priorità 2: fallback su score puro
+    if not candidates:
+        candidates = sorted(s2, key=lambda x: x.score, reverse=True)
+
+    for a in candidates[:max_promote]:
+        a.section = "section1"
+        logger.info(f"Fallback section1 promosso: {a.title[:60]} (score {a.score})")
+
+
 # ── Job: fetch + score + notifica ─────────────────────────────
 async def job_fetch_and_notify() -> None:
     logger.info("=== JOB: fetch + score + notifica admin ===")
@@ -143,6 +180,32 @@ async def job_fetch_and_notify() -> None:
                 )
 
         session.commit()
+
+        # Fallback section1: se vuota, promuovi i migliori da section2
+        if not section1:
+            all_today = session.exec(
+                sql_select(Article).where(Article.digest_date == today)
+            ).all()
+            _promote_fallback_section1(all_today)
+            session.commit()
+            # Ricostruisci lista section1 per la notifica
+            for a in all_today:
+                if a.section == "section1":
+                    section1.append(
+                        {
+                            "id": a.id,
+                            "title": a.title,
+                            "excerpt": a.excerpt,
+                            "feed_name": a.feed_name,
+                            "url": a.url,
+                            "score": a.score,
+                        }
+                    )
+            if section1:
+                logger.info(
+                    f"Fallback attivato — {len(section1)} articoli promossi a section1"
+                )
+
         logger.info(f"FeedStats salvate per {len(feed_fetched)} feed")
         logger.info(f"Salvati {saved} articoli — Section1: {len(section1)}")
 

@@ -296,15 +296,23 @@ class Scorer:
         SECTION1_MIN_SCORE = 8.0
 
         # Feed locali (livello 3): il cluster B deve essere nel titolo
-        # Se B non è nel titolo → discarded, indipendentemente dal punteggio
+        # Eccezione: se A+B presenti con score alto → section2 (mai section1)
+        # Altrimenti → discarded
         if feed_level == 3:
             _, b_title_found = self._match_text(title, "B")
             if not b_title_found:
-                result.score = 0.0
-                result.section = "discarded"
-                result.score_detail = detail
-                result.keyword_matches = []
-                return result
+                if has_A and has_B and total >= SECTION1_MIN_SCORE:
+                    result.score = total
+                    result.section = "section2"
+                    result.score_detail = detail
+                    result.keyword_matches = list(set(all_matches))
+                    return result
+                else:
+                    result.score = 0.0
+                    result.section = "discarded"
+                    result.score_detail = detail
+                    result.keyword_matches = []
+                    return result
 
         if has_A and (has_B or has_C) and total >= SECTION1_MIN_SCORE:
             section = "section1"

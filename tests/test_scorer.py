@@ -172,19 +172,28 @@ def test_feed_level3_keyword_b_nel_titolo():
 
 
 def test_feed_level3_keyword_b_solo_excerpt():
-    """Feed locale (level 3): Cluster B solo nell'excerpt → discarded"""
+    """Feed locale (level 3): B solo nell'excerpt con score alto → section2 (mai section1)"""
     scorer = make_scorer()
     result = scorer.score(
         title="Notizie dalla Calabria",
         excerpt="Un nuovo hub digitale aprirà grazie al PNRR.",
         feed_level=3,
     )
+    assert result.section == "section2"
+
+
+def test_feed_level3_keyword_b_solo_excerpt_score_basso():
+    """Feed locale (level 3): B solo nell'excerpt con score basso → discarded"""
+    scorer = make_scorer()
+    result = scorer.score(
+        title="Notizie dalla Calabria",
+        excerpt="Una piccola iniziativa tech.",
+        feed_level=3,
+    )
     assert result.section == "discarded"
 
 
 # ── Test keyword_matches ───────────────────────────────────────
-
-
 def test_keyword_matches_popolato():
     scorer = make_scorer()
     result = scorer.score(
