@@ -31,6 +31,7 @@ clusters:
       - { word: 'tecnologie emergenti', weight: 1.5 }
       - { word: 'intelligenza artificiale', weight: 2.0 }
       - { word: 'blockchain', weight: 1.5 }
+      - { word: 'innovazione', weight: 1.5 }
       - { word: 'cybersecurity', weight: 1.5 }
       - { word: 'fintech', weight: 1.8 }
       - { word: 'pnrr', weight: 1.8 }
