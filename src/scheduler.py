@@ -215,6 +215,47 @@ async def job_startup_recovery() -> None:
         session.close()
 
 
+# ── Job: pulizia DB settimanale ────────────────────────────────
+async def job_cleanup_db() -> None:
+    """
+    Eseguito ogni domenica notte alle 02:00.
+    Cancella articoli e relative voci in coda più vecchi di 90 giorni.
+    """
+    from datetime import timedelta
+
+    from sqlmodel import select
+
+    from src.models import PublishQueue
+
+    session = next(get_session())
+    try:
+        cutoff = date.today() - timedelta(days=90)
+        logger.info(f"Pulizia DB: rimozione articoli antecedenti al {cutoff}")
+
+        # Prima cancella le voci in PublishQueue (FK su Article)
+        old_queue = session.exec(
+            select(PublishQueue).where(PublishQueue.digest_date < cutoff)
+        ).all()
+        for q in old_queue:
+            session.delete(q)
+
+        # Poi cancella gli articoli
+        old_articles = session.exec(
+            select(Article).where(Article.digest_date < cutoff)
+        ).all()
+        n_articles = len(old_articles)
+        for a in old_articles:
+            session.delete(a)
+
+        session.commit()
+        logger.info(f"Pulizia DB completata: {n_articles} articoli rimossi")
+
+    except Exception as e:
+        logger.error(f"Errore pulizia DB: {e}")
+    finally:
+        session.close()
+
+
 # ── Setup scheduler ────────────────────────────────────────────
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="Europe/Rome")
@@ -234,6 +275,15 @@ def build_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=7, minute=5, timezone="Europe/Rome"),
         id="heartbeat",
         name="Heartbeat sistema",
+        replace_existing=True,
+    )
+
+    # Pulizia DB ogni domenica notte alle 02:00
+    scheduler.add_job(
+        job_cleanup_db,
+        CronTrigger(day_of_week="sun", hour=2, minute=0, timezone="Europe/Rome"),
+        id="cleanup_db",
+        name="Pulizia DB settimanale",
         replace_existing=True,
     )
 
