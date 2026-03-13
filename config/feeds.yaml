@@ -65,8 +65,8 @@ feeds:
     level: 2
     category: generalista
     region: null
-  - name: AGI Innovazione
-    url: https://www.agi.it/innovazione/rss
+  - name: AGI
+    url: https://www.agi.it/rss.xml
     level: 2
     category: generalista
     region: null
