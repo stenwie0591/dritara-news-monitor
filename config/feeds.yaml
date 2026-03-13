@@ -1,151 +1,152 @@
 feeds:
-- name: Wired Italia
-  url: https://wired.it/feed/rss
-  level: 1
-  category: tech
-  region: null
-- name: StartupItalia
-  url: https://startupitalia.eu/feed
-  level: 1
-  category: tech
-  region: null
-- name: Agenda Digitale
-  url: https://agendadigitale.eu/feed
-  level: 1
-  category: tech
-  region: null
-- name: Innovation Post
-  url: https://innovationpost.it/feed
-  level: 1
-  category: tech
-  region: null
-- name: Il Sole 24 Ore Tecnologia
-  url: https://www.ilsole24ore.com/rss/economia.xml
-  level: 1
-  category: tech
-  region: null
-- name: Il Sole 24 Ore Impresa
-  url: https://www.ilsole24ore.com/rss/italia.xml
-  level: 1
-  category: tech
-  region: null
-- name: Corriere Comunicazioni
-  url: https://www.corrierecomunicazioni.it/feed/
-  level: 1
-  category: tech
-  region: null
-- name: Italian Tech
-  url: https://www.italian.tech/rss
-  level: 1
-  category: tech
-  region: null
-- name: Startup News
-  url: https://www.startup-news.it/feed
-  level: 1
-  category: tech
-  region: null
-- name: Formiche
-  url: https://formiche.net/feed/
-  level: 1
-  category: tech
-  region: null
-- name: ANSA Economia
-  url: https://www.ansa.it/sito/notizie/economia/economia_rss.xml
-  level: 2
-  category: generalista
-  region: null
-- name: ANSA Tecnologia
-  url: https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml
-  level: 2
-  category: generalista
-  region: null
-- name: ANSA PMI
-  url: https://www.ansa.it/sito/notizie/economia/pmi/pmi_rss.xml
-  level: 2
-  category: generalista
-  region: null
-- name: AGI Innovazione
-  url: https://www.agi.it/innovazione/rss
-  level: 2
-  category: generalista
-  region: null
-- name: Repubblica Tecnologia
-  url: https://www.repubblica.it/rss/tecnologia/rss2.0.xml
-  level: 2
-  category: generalista
-  region: null
-- name: Corriere Economia
-  url: https://www.corriere.it/rss/economia.xml
-  level: 2
-  category: generalista
-  region: null
-- name: Adnkronos
-  url: https://www.adnkronos.com/rss/
-  level: 2
-  category: generalista
-  region: null
-- name: Il Giornale delle PMI
-  url: https://www.giornaledellepmi.it/feed
-  level: 2
-  category: generalista
-  region: null
-- name: Il Mattino
-  url: https://www.ilmattino.it/rss/home.xml
-  level: 3
-  category: locale
-  region: campania
-- name: Gazzetta del Sud Calabria
-  url: https://feedpress.me/gsud_hp_calabria
-  level: 3
-  category: locale
-  region: calabria
-- name: Gazzetta del Sud Cosenza
-  url: https://feedpress.me/gsud_hp_cosenza
-  level: 3
-  category: locale
-  region: calabria
-- name: Gazzetta del Mezzogiorno
-  url: https://www.lagazzettadelmezzogiorno.it/sezioni/183/rss
-  level: 3
-  category: locale
-  region: puglia
-- name: Quotidiano del Sud
-  url: https://www.quotidianodelsud.it/feed
-  level: 3
-  category: locale
-  region: calabria
-- name: Corriere della Calabria
-  url: https://www.corrieredellacalabria.it/feed
-  level: 3
-  category: locale
-  region: calabria
-- name: Innovation Island
-  url: https://innovationisland.it/feed
-  level: 3
-  category: locale
-  region: sicilia
-- name: LiveSicilia
-  url: https://livesicilia.it/feed/
-  level: 3
-  category: locale
-  region: sicilia
-- name: ANSA Calabria
-  url: https://www.ansa.it/calabria/notizie/calabria_rss.xml
-  level: 3
-  category: locale
-  region: calabria
-- name: ANSA Campania
-  url: https://www.ansa.it/campania/notizie/campania_rss.xml
-  level: 3
-  category: locale
-  region: campania
-- name: ANSA Puglia
-  url: https://www.ansa.it/puglia/notizie/puglia_rss.xml
-  level: 3
-  category: locale
-  region: puglia
-- name: ANSA Sicilia
-  url: https://www.ansa.it/sicilia/notizie/sicilia_rss.xml
-  level: 3
-  category: locale
-  region: sicilia
+  - name: Wired Italia
+    url: https://wired.it/feed/rss
+    level: 1
+    category: tech
+    region: null
+  - name: StartupItalia
+    url: https://startupitalia.eu/feed
+    level: 1
+    category: tech
+    region: null
+  - name: Agenda Digitale
+    url: https://agendadigitale.eu/feed
+    level: 1
+    category: tech
+    region: null
+  - name: Innovation Post
+    url: https://innovationpost.it/feed
+    level: 1
+    category: tech
+    region: null
+  - name: Il Sole 24 Ore Tecnologia
+    url: https://www.ilsole24ore.com/rss/economia.xml
+    level: 1
+    category: tech
+    region: null
+  - name: Il Sole 24 Ore Impresa
+    url: https://www.ilsole24ore.com/rss/italia.xml
+    level: 1
+    category: tech
+    region: null
+  - name: Corriere Comunicazioni
+    url: https://www.corrierecomunicazioni.it/feed/
+    level: 1
+    category: tech
+    region: null
+  - name: Italian Tech
+    url: https://www.italian.tech/rss
+    level: 1
+    category: tech
+    region: null
+  - name: Startup News
+    url: https://www.startup-news.it/feed
+    level: 1
+    category: tech
+    region: null
+  - name: Formiche
+    url: https://formiche.net/feed/
+    level: 1
+    category: tech
+    region: null
+  - name: ANSA Economia
+    url: https://www.ansa.it/sito/notizie/economia/economia_rss.xml
+    level: 2
+    category: generalista
+    region: null
+  - name: ANSA Tecnologia
+    url: https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml
+    level: 2
+    category: generalista
+    region: null
+  - name: ANSA PMI
+    url: https://www.ansa.it/sito/notizie/economia/pmi/pmi_rss.xml
+    level: 2
+    category: generalista
+    region: null
+  - name: AGI Innovazione
+    url: https://www.agi.it/innovazione/rss
+    level: 2
+    category: generalista
+    region: null
+  - name: Repubblica Tecnologia
+    url: https://www.repubblica.it/rss/tecnologia/rss2.0.xml
+    level: 2
+    category: generalista
+    region: null
+  - name: Corriere Economia
+    url: https://www.corriere.it/rss/economia.xml
+    level: 2
+    category: generalista
+    region: null
+  - name: Adnkronos
+    url: https://www.adnkronos.com/RSS_Economia.xml
+    level: 2
+    category: generalista
+    region: null
+  - name: Il Giornale delle PMI
+    url: https://www.giornaledellepmi.it/feed
+    level: 2
+    category: generalista
+    region: null
+  - name: Il Mattino
+    url: https://www.ilmattino.it/rss/home.xml
+    level: 3
+    category: locale
+    region: campania
+  - name: Gazzetta del Sud Calabria
+    url: https://feedpress.me/gsud_hp_calabria
+    level: 3
+    category: locale
+    region: calabria
+  - name: Gazzetta del Sud Cosenza
+    url: https://feedpress.me/gsud_hp_cosenza
+    level: 3
+    category: locale
+    region: calabria
+  - name: Gazzetta del Mezzogiorno
+    url: https://www.lagazzettadelmezzogiorno.it/sezioni/183/rss
+    level: 3
+    category: locale
+    region: puglia
+    active: false
+  - name: Quotidiano del Sud
+    url: https://www.quotidianodelsud.it/feed
+    level: 3
+    category: locale
+    region: calabria
+  - name: Corriere della Calabria
+    url: https://www.corrieredellacalabria.it/feed
+    level: 3
+    category: locale
+    region: calabria
+  - name: Innovation Island
+    url: https://innovationisland.it/feed
+    level: 3
+    category: locale
+    region: sicilia
+  - name: LiveSicilia
+    url: https://livesicilia.it/feed/
+    level: 3
+    category: locale
+    region: sicilia
+  - name: ANSA Calabria
+    url: https://www.ansa.it/calabria/notizie/calabria_rss.xml
+    level: 3
+    category: locale
+    region: calabria
+  - name: ANSA Campania
+    url: https://www.ansa.it/campania/notizie/campania_rss.xml
+    level: 3
+    category: locale
+    region: campania
+  - name: ANSA Puglia
+    url: https://www.ansa.it/puglia/notizie/puglia_rss.xml
+    level: 3
+    category: locale
+    region: puglia
+  - name: ANSA Sicilia
+    url: https://www.ansa.it/sicilia/notizie/sicilia_rss.xml
+    level: 3
+    category: locale
+    region: sicilia
