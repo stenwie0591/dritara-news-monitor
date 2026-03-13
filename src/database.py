@@ -1,4 +1,3 @@
-from datetime import datetime
 from pathlib import Path
 from typing import Generator
 
@@ -10,8 +9,8 @@ from src.models import Article, DigestLog, FeedSource, KeywordConfig
 
 # ── Percorsi ───────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
-DB_PATH  = BASE_DIR / "data" / "dritara.db"
-CFG_DIR  = BASE_DIR / "config"
+DB_PATH = BASE_DIR / "data" / "dritara.db"
+CFG_DIR = BASE_DIR / "config"
 
 # ── Engine singleton ───────────────────────────────────────────
 engine = create_engine(
@@ -36,6 +35,15 @@ def get_session() -> Generator[Session, None, None]:
     """Dependency per ottenere una sessione DB."""
     with Session(engine) as session:
         yield session
+
+
+# ── NOTA ARCHITETTURALE ────────────────────────────────────────
+# I file YAML (feeds.yaml, keywords.yaml) sono usati SOLO per il seed
+# iniziale del DB quando è vuoto. A runtime il DB è l'unica sorgente
+# di verità. Modifiche operative (keyword, feed) vanno fatte sul DB
+# direttamente o tramite bot. I YAML vanno aggiornati manualmente
+# solo per documentazione e per eventuali reset completi del DB.
+# ──────────────────────────────────────────────────────────────
 
 
 # ── Seed feed sources ──────────────────────────────────────────
@@ -76,11 +84,13 @@ def _seed_keywords(session: Session) -> None:
     count = 0
     for cluster_id, cluster_data in config.get("clusters", {}).items():
         for kw in cluster_data.get("keywords", []):
-            session.add(KeywordConfig(
-                cluster=cluster_id,
-                keyword=kw["word"],
-                weight=kw["weight"],
-            ))
+            session.add(
+                KeywordConfig(
+                    cluster=cluster_id,
+                    keyword=kw["word"],
+                    weight=kw["weight"],
+                )
+            )
             count += 1
 
     session.commit()
@@ -89,15 +99,11 @@ def _seed_keywords(session: Session) -> None:
 
 # ── Query helpers ──────────────────────────────────────────────
 def get_active_feeds(session: Session) -> list[FeedSource]:
-    return session.exec(
-        select(FeedSource).where(FeedSource.active == True)
-    ).all()
+    return session.exec(select(FeedSource).where(FeedSource.active == True)).all()
 
 
 def get_active_keywords(session: Session) -> list[KeywordConfig]:
-    return session.exec(
-        select(KeywordConfig).where(KeywordConfig.active == True)
-    ).all()
+    return session.exec(select(KeywordConfig).where(KeywordConfig.active == True)).all()
 
 
 def article_exists(session: Session, article_id: str) -> bool:
@@ -105,9 +111,7 @@ def article_exists(session: Session, article_id: str) -> bool:
 
 
 def get_articles_by_date(session: Session, digest_date) -> list[Article]:
-    return session.exec(
-        select(Article).where(Article.digest_date == digest_date)
-    ).all()
+    return session.exec(select(Article).where(Article.digest_date == digest_date)).all()
 
 
 def get_digest_log(session: Session, digest_date) -> DigestLog | None:
