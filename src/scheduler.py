@@ -59,7 +59,6 @@ async def job_fetch_and_notify() -> None:
                 feed_level=a.get("feed_level", 2),
             )
             if scored.section != "discarded":
-                # Salta se l'articolo è già nel DB
                 from src.database import article_exists
 
                 if article_exists(session, a["id"]):
@@ -130,12 +129,73 @@ async def job_publish(hour: int) -> None:
         logger.error(f"Errore pubblicazione alle {hour}:00")
 
 
+# ── Recovery stati orfani ──────────────────────────────────────
+async def job_recover_orphan_publishing() -> None:
+    """
+    Eseguito all'avvio: riporta a 'approved' qualsiasi articolo
+    rimasto bloccato in stato 'publishing' a causa di un crash.
+    Questo può succedere se il servizio si riavvia tra mark_publishing()
+    e mark_published().
+    """
+    from sqlmodel import select
+
+    from src.models import PublishQueue
+
+    session = next(get_session())
+    try:
+        orfani = session.exec(
+            select(PublishQueue).where(PublishQueue.status == "publishing")
+        ).all()
+
+        if not orfani:
+            logger.info("Recovery publishing: nessun articolo orfano trovato")
+            return
+
+        for q in orfani:
+            q.status = "approved"
+            session.add(q)
+            logger.warning(
+                f"Recovery publishing: articolo {q.article_id[:16]}... "
+                f"riportato da 'publishing' a 'approved'"
+            )
+
+        session.commit()
+        logger.info(f"Recovery publishing: {len(orfani)} articoli ripristinati")
+
+        # Notifica admin
+        import os
+
+        from src.sender_telegram import _send
+
+        admin_id = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID", "0"))
+        if admin_id:
+            await _send(
+                admin_id,
+                (
+                    f"⚠️ *Recovery al riavvio*\n\n"
+                    f"{len(orfani)} articolo/i era bloccato in stato `publishing` "
+                    f"(probabile crash precedente).\n"
+                    f"Riportato/i ad `approved` — verrà pubblicato al prossimo slot orario."
+                ),
+            )
+
+    except Exception as e:
+        logger.error(f"Errore recovery publishing orfano: {e}")
+    finally:
+        session.close()
+
+
 # ── Recovery job saltati ───────────────────────────────────────
 async def job_startup_recovery() -> None:
     """
     Eseguito all'avvio: se il fetch di oggi non è ancora stato fatto
     (nessun articolo con digest_date = oggi), lo lancia immediatamente.
+    Esegue anche il recovery degli stati publishing orfani.
     """
+    # Prima: ripristina eventuali stati publishing orfani
+    await job_recover_orphan_publishing()
+
+    # Poi: verifica se il fetch di oggi è già stato fatto
     session = next(get_session())
     try:
         from sqlmodel import select
@@ -188,7 +248,7 @@ def build_scheduler() -> AsyncIOScheduler:
             replace_existing=True,
         )
 
-        # Recovery all'avvio — lancia fetch se oggi non è ancora stato fatto
+    # Recovery all'avvio — publishing orfani + fetch mancato
     scheduler.add_job(
         job_startup_recovery,
         "date",  # eseguito una sola volta, subito
