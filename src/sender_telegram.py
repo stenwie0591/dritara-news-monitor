@@ -69,15 +69,20 @@ async def _send(
 
 
 # ── Notifica admin ─────────────────────────────────────────────
-async def notify_admin(articles: list[dict], digest_date: date) -> None:
+async def notify_admin(
+    articles_s1: list[dict],
+    digest_date: date,
+    articles_s2: Optional[list[dict]] = None,
+) -> None:
     """
     Manda all'admin la lista articoli del giorno.
-    Prima mostra i deferred del giorno precedente, poi i nuovi.
+    Ordine: deferred → section1 (🔴) → section2 top 5 (🟡)
+    Max 1 articolo per feed sull'intera lista.
     """
-    # Carica deferred dei giorni precedenti
+    articles_s2 = articles_s2 or []
     deferred = _get_deferred_articles()
 
-    if not articles and not deferred:
+    if not articles_s1 and not articles_s2 and not deferred:
         await _send(ADMIN_ID, "📭 Nessun articolo disponibile oggi.")
         return
 
@@ -89,7 +94,7 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
 
     all_articles = []
 
-    # Prima i deferred (con etichetta)
+    # ── Deferred ───────────────────────────────────────────────
     if deferred:
         lines.append("*⏭️ In attesa dai giorni precedenti:*")
         for item in deferred:
@@ -104,29 +109,35 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
                 f"   _{a['feed_name']} · score {a['score']:.1f} · rimandato {count}x_\n"
             )
 
-    # Filtra nuovi già pubblicati di recente
+    # ── Filtra già pubblicati + max 1 per feed ─────────────────
     session = next(get_session())
-    articles = [a for a in articles if not _is_already_published(a["title"], session)]
 
-    # Max 2 articoli per feed nella lista giornaliera
-    MAX_PER_FEED = 2
+    MAX_PER_FEED = 1
     feed_counts: dict = {}
-    filtered_articles = []
-    for a in articles:
-        feed = a["feed_name"]
-        feed_counts[feed] = feed_counts.get(feed, 0) + 1
-        if feed_counts[feed] <= MAX_PER_FEED:
-            filtered_articles.append(a)
-        else:
-            logger.debug(f"Feed limit ({MAX_PER_FEED}): {a['title'][:60]}")
-    articles = filtered_articles
+
+    def _filter(articles: list[dict]) -> list[dict]:
+        result = []
+        for a in articles:
+            if _is_already_published(a["title"], session):
+                continue
+            feed = a["feed_name"]
+            feed_counts[feed] = feed_counts.get(feed, 0) + 1
+            if feed_counts[feed] <= MAX_PER_FEED:
+                result.append(a)
+            else:
+                logger.debug(f"Feed limit ({MAX_PER_FEED}): {a['title'][:60]}")
+        return result
+
+    articles_s1 = _filter(articles_s1)
+    articles_s2 = _filter(articles_s2)
     session.close()
 
-    # Poi i nuovi
-    if articles:
+    # ── Section1 🔴 ────────────────────────────────────────────
+    if articles_s1:
         if deferred:
             lines.append("*🆕 Nuovi di oggi:*")
-        for a in articles:
+        lines.append("*🔴 Sud + Tech:*")
+        for a in articles_s1:
             all_articles.append({"source": "new", **a})
             i = len(all_articles)
             lines.append(
@@ -134,7 +145,18 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
                 f"   _{a['feed_name']} · score {a['score']:.1f}_\n"
             )
 
-    # Salva tutti in pending
+    # ── Section2 🟡 top 5 ──────────────────────────────────────
+    if articles_s2:
+        lines.append("*🟡 Trend nazionali:*")
+        for a in articles_s2[:5]:
+            all_articles.append({"source": "new", **a})
+            i = len(all_articles)
+            lines.append(
+                f"*{i}.* [{a['title']}]({a['url']})\n"
+                f"   _{a['feed_name']} · score {a['score']:.1f}_\n"
+            )
+
+    # ── Salva in pending ───────────────────────────────────────
     _save_pending(all_articles, digest_date)
 
     text = "\n".join(lines)
@@ -145,7 +167,10 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
     else:
         await _send(ADMIN_ID, text)
 
-    logger.info(f"Notifica admin — {len(deferred)} deferred + {len(articles)} nuovi")
+    logger.info(
+        f"Notifica admin — {len(deferred)} deferred + "
+        f"{len(articles_s1)} s1 + {len(articles_s2[:5])} s2"
+    )
 
 
 # ── Pubblicazione nel topic ────────────────────────────────────

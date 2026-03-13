@@ -42,7 +42,6 @@ def _promote_fallback_section1(articles: list, max_promote: int = 2) -> None:
     if not s2:
         return
 
-    # Priorità 1: territorial boost applicato (A+B già presenti)
     import ast
 
     with_boost = []
@@ -60,7 +59,6 @@ def _promote_fallback_section1(articles: list, max_promote: int = 2) -> None:
 
     candidates = sorted(with_boost, key=lambda x: x.score, reverse=True)
 
-    # Priorità 2: fallback su score puro
     if not candidates:
         candidates = sorted(s2, key=lambda x: x.score, reverse=True)
 
@@ -181,14 +179,16 @@ async def job_fetch_and_notify() -> None:
 
         session.commit()
 
+        # Carica tutti gli articoli di oggi
+        # (serve sia per fallback section1 che per costruire section2)
+        all_today = session.exec(
+            sql_select(Article).where(Article.digest_date == today)
+        ).all()
+
         # Fallback section1: se vuota, promuovi i migliori da section2
         if not section1:
-            all_today = session.exec(
-                sql_select(Article).where(Article.digest_date == today)
-            ).all()
             _promote_fallback_section1(all_today)
             session.commit()
-            # Ricostruisci lista section1 per la notifica
             for a in all_today:
                 if a.section == "section1":
                     section1.append(
@@ -209,9 +209,27 @@ async def job_fetch_and_notify() -> None:
         logger.info(f"FeedStats salvate per {len(feed_fetched)} feed")
         logger.info(f"Salvati {saved} articoli — Section1: {len(section1)}")
 
-        # Notifica admin con articoli section1 ordinati per score
+        # Costruisci lista section2 top 5 per score
+        section2 = sorted(
+            [
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "excerpt": a.excerpt,
+                    "feed_name": a.feed_name,
+                    "url": a.url,
+                    "score": a.score,
+                }
+                for a in all_today
+                if a.section == "section2"
+            ],
+            key=lambda x: x["score"],
+            reverse=True,
+        )[:5]
+
+        # Notifica admin con section1 + section2
         section1.sort(key=lambda x: x["score"], reverse=True)
-        await notify_admin(section1, today)
+        await notify_admin(section1, today, articles_s2=section2)
 
         # Upload CSV giornaliero su Drive
         from sqlmodel import select as sql_select_pq
@@ -409,7 +427,6 @@ async def job_backup_drive() -> None:
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="Europe/Rome")
 
-    # Fetch + notifica admin alle 07:00
     scheduler.add_job(
         job_fetch_and_notify,
         CronTrigger(hour=7, minute=0, timezone="Europe/Rome"),
@@ -418,7 +435,6 @@ def build_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Heartbeat alle 7:05
     scheduler.add_job(
         send_heartbeat,
         CronTrigger(hour=7, minute=5, timezone="Europe/Rome"),
@@ -427,7 +443,6 @@ def build_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Pulizia DB ogni domenica notte alle 02:00
     scheduler.add_job(
         job_cleanup_db,
         CronTrigger(day_of_week="sun", hour=2, minute=0, timezone="Europe/Rome"),
@@ -436,7 +451,6 @@ def build_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Backup SQLite ogni domenica notte alle 02:30
     scheduler.add_job(
         job_backup_drive,
         CronTrigger(day_of_week="sun", hour=2, minute=30, timezone="Europe/Rome"),
@@ -445,7 +459,6 @@ def build_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Pubblicazione agli orari prestabiliti
     for hour in PUBLISH_HOURS:
         scheduler.add_job(
             job_publish,
@@ -456,7 +469,6 @@ def build_scheduler() -> AsyncIOScheduler:
             replace_existing=True,
         )
 
-    # Recovery all'avvio — publishing orfani + fetch mancato
     scheduler.add_job(
         job_startup_recovery,
         "date",
