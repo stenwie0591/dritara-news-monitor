@@ -107,6 +107,19 @@ async def notify_admin(articles: list[dict], digest_date: date) -> None:
     # Filtra nuovi già pubblicati di recente
     session = next(get_session())
     articles = [a for a in articles if not _is_already_published(a["title"], session)]
+
+    # Max 2 articoli per feed nella lista giornaliera
+    MAX_PER_FEED = 2
+    feed_counts: dict = {}
+    filtered_articles = []
+    for a in articles:
+        feed = a["feed_name"]
+        feed_counts[feed] = feed_counts.get(feed, 0) + 1
+        if feed_counts[feed] <= MAX_PER_FEED:
+            filtered_articles.append(a)
+        else:
+            logger.debug(f"Feed limit ({MAX_PER_FEED}): {a['title'][:60]}")
+    articles = filtered_articles
     session.close()
 
     # Poi i nuovi
