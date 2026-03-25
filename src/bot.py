@@ -684,8 +684,9 @@ async def _handle_kwset(text: str) -> None:
         )
         return
 
-    _, keyword, peso_str = parts
-    keyword = keyword.strip().lower()
+    # Ultimo token è il peso, tutto il resto è la keyword
+    peso_str = parts[-1]
+    keyword = " ".join(parts[1:-1]).strip().lower()
 
     try:
         nuovo_peso = float(peso_str)
