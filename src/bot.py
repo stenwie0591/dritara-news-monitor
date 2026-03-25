@@ -676,7 +676,7 @@ async def _handle_kwset(text: str) -> None:
     from src.database import get_session
     from src.models import KeywordConfig, KeywordWeightHistory
 
-    parts = text.split(maxsplit=2)
+    parts = text.split()
     if len(parts) < 3:
         await _send(
             ADMIN_ID,
