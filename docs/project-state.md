@@ -10,7 +10,7 @@
 | Ultima verifica | 2026-07-15 |
 | Baseline Git | branch `feature/codex_init`; M01.05 pronto al commit |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
-| Verifica locale | `make check`: 227 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13 |
+| Verifica locale | `make check`: 228 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13 |
 | DB analizzato | `data/dritara.db`, snapshot del solo 2026-03-08 |
 | Fonte runtime | SQLite; YAML solo seed, salvo diversa indicazione |
 
@@ -61,7 +61,7 @@
 ## Ultimo micro-task completato
 
 - ID/owner/data: `M01.05` / Codex / 2026-07-15; stato `done`.
-- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 227 test, docs e compile verdi su Python 3.13. Il primo run remoto ha rilevato la dipendenza condizionale Linux `greenlet`, aggiunta esplicitamente; la matrice corretta 3.11/3.13 resta l'evidenza conclusiva.
+- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 228 test, docs e compile verdi su Python 3.13. Il primo run remoto ha rilevato la dipendenza condizionale Linux `greenlet`, aggiunta esplicitamente; la matrice corretta 3.11/3.13 resta l'evidenza conclusiva.
 - Sicurezza: file sensibili presenti devono essere regolari, non symlink e `0600`; token/log writer applicano `0600`, directory log/backup `0700`; contract test dimostra redazione token prima del sink.
 - Rollout/rollback: nessuna migrazione/flag. File permissivo blocca startup/autorizzazione con istruzione di correggere il mode; rollback coordinato di lock, bootstrap e script.
 - Residuo: SBOM e update automation restano M05.06; egress firewall host M05.07; nessun rischio critico M01.05 accettato in deroga.
