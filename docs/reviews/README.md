@@ -7,4 +7,4 @@ Un file può nascere con decisione `PENDING`; `GO`, `RECYCLE`, `HOLD` o `STOP` r
 ## Review
 
 - [M00 — GO](M00-2026-07-14.md)
-- [M01 — PENDING](M01-2026-07-15.md)
+- [M01 — GO](M01-2026-07-15.md)

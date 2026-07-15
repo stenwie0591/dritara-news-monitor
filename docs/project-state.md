@@ -2,11 +2,11 @@
 
 | Campo | Valore |
 |---|---|
-| Stato | M01 review completata, decisione umana richiesta |
-| Macro attivo | `M01` — sicurezza e configurazione (`gate_pending`) |
-| Micro attivo | nessuno; gate M01 `PENDING` |
+| Stato | M01 chiuso; confronto preliminare richiesto prima di M02 |
+| Macro attivo | nessuno; M02 autorizzato ma non avviato |
+| Micro attivo | nessuno |
 | WIP micro | 0 / limite predefinito 2 |
-| Ultimo gate accettato | M00 `GO`, project owner, 2026-07-15 |
+| Ultimo gate accettato | M01 `GO`, project owner, 2026-07-15 |
 | Ultima verifica | 2026-07-15 |
 | Baseline Git | branch `feature/codex_init`; `72b0888` prima del pacchetto gate M01 |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
@@ -55,8 +55,8 @@
 
 ## Prossimi passi
 
-1. Il project owner decide `GO/RECYCLE/HOLD/STOP` sulla [review M01](reviews/M01-2026-07-15.md).
-2. Solo con `GO`: chiudere M01, avviare M02 e promuovere M02.01 a `ready`.
+1. Rispondere alle domande preliminari del project owner senza avviare M02.
+2. Su successiva istruzione esplicita: portare M02 `in_progress` e M02.01 `ready`.
 3. M02.05/M02.07 restano bloccati fino a snapshot recente autorizzato.
 
 ## Ultimo micro-task completato
@@ -73,4 +73,4 @@ Non eseguire migrazioni sul DB reale senza snapshot consistente, checksum, dry-r
 
 ## Regola di avanzamento
 
-M01 è autorizzato dal gate M00. M02 non può entrare `in_progress` finché M01 non ha review completa, documentazione sincronizzata e gate umano `GO`.
+M01 è chiuso con gate umano `GO`. M02 è autorizzabile, ma resta `proposed` finché il project owner non conclude il confronto preliminare e ne richiede l'avvio.
