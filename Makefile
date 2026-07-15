@@ -20,7 +20,7 @@ test:
 	$(PYTHON) -m pytest tests/ -v --tb=short
 
 compile:
-	$(PYTHON) -m compileall -q main.py src tests
+	$(PYTHON) -m compileall -q main.py src migrations tests
 
 docs-check:
 	$(PYTHON) scripts/check_docs.py

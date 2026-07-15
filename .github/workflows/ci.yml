@@ -24,7 +24,7 @@ jobs:
       - run: python -m pip install --require-hashes -r requirements-dev.lock
       - run: python -m pip_audit -r requirements.lock --require-hashes
       - run: python -m pip check
-      - run: python -m compileall -q main.py src tests
+      - run: python -m compileall -q main.py src migrations tests
       - run: python scripts/check_docs.py
       - run: python -m scripts.check_secret_hygiene
       - run: python -m pytest tests --tb=short --junitxml=.pytest-results.xml
