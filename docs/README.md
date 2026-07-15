@@ -34,6 +34,7 @@ Non dedurre che una decisione sia già implementata. Verificare sempre [project-
 - [Valutazione del framework](governance/framework-assessment.md) — fondamenti teorici, audit dopo M00/M01, limiti e criteri di validazione.
 - [Guida di adozione](governance/adoption-guide.md) — nucleo portabile, profili di rigore e bootstrap di altri progetti.
 - [Starter kit Project Brain](../templates/project-brain/README.md) — struttura neutra copiabile in un nuovo repository.
+- [Prompt bootstrap brownfield](../templates/PROJECT_BRAIN_BOOTSTRAP_PROMPT.md) — mandato autosufficiente da copiare in un progetto esistente e affidare a Codex.
 - [Template macro](governance/macro-task-template.md), [micro](governance/micro-task-template.md) e [gate review](governance/macro-review-template.md).
 - [Risk register](governance/risk-register.md) e [gate review storiche](reviews/README.md).
 - [ADR index](governance/adr-index.md) e [template ADR](governance/adr-template.md).

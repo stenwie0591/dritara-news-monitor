@@ -2,6 +2,8 @@
 
 Baseline portabile del Dritara Evidence-Gated Delivery Framework. I file contengono segnaposto e non includono codice, dati, segreti, rischi o decisioni specifiche di Dritara.
 
+Per un progetto brownfield già esistente è preferibile usare il prompt orchestratore `templates/PROJECT_BRAIN_BOOTSTRAP_PROMPT.md`: l'agente inventaria e riconcilia la documentazione prima di sostituirla, quindi costruisce il Brain e si ferma al gate umano.
+
 ## Installazione
 
 Da una copia del repository Dritara:

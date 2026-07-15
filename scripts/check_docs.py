@@ -30,6 +30,7 @@ REQUIRED = [
     "docs/adr/004-portable-project-brain.md",
 ]
 STARTER_REQUIRED = [
+    "templates/PROJECT_BRAIN_BOOTSTRAP_PROMPT.md",
     "templates/project-brain/README.md",
     "templates/project-brain/AGENTS.md",
     "templates/project-brain/docs/README.md",

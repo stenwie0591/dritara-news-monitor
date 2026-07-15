@@ -85,3 +85,11 @@ La Definition of Done completa è in [governance/definition-of-done.md](governan
 - Evidenze: `docs/governance/framework-assessment.md`, `docs/governance/adoption-guide.md`, `templates/project-brain/`; checker documentale esteso e `make check` verde.
 - Invarianti: nessun codice runtime, dato, gate storico o macro di delivery modificato; M02 resta `proposed` e nessun micro M02 è attivo.
 - Uso: copiare lo starter kit in un repository nuovo, sostituire i segnaposto, verificare l'AS-IS e definire roadmap/rischi prima di promuovere il primo task.
+
+## Ultima manutenzione governance — GOV.002
+
+- Stato/owner/data: `GOV.002` `done`, Codex su richiesta del project owner, 2026-07-15.
+- Scope: prompt autosufficiente per bootstrap brownfield completo, inclusi safety, migrazione docs, analisi AS-IS, framework, M00, TO-BE, backlog, checker, commit, gate e brainstorming.
+- Evidenze: `templates/PROJECT_BRAIN_BOOTSTRAP_PROMPT.md`; link in indice, adoption guide e starter kit; checker e `make check` verdi.
+- Invarianti: nessuna modifica runtime o dati; M01 resta chiuso e M02 non avviato.
+- Invocazione: copiare il file nella root del progetto target e chiedere all'agente di leggerlo integralmente ed eseguirlo, fermandosi ai gate umani.

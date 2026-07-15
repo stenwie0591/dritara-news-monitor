@@ -42,6 +42,22 @@ Threat model, runbook, data model, product metrics e documenti operativi si aggi
 
 ## Bootstrap di un nuovo progetto
 
+### Progetto brownfield con un agente Codex
+
+Se il progetto contiene già codice e documentazione, copiare il [prompt brownfield autosufficiente](../../templates/PROJECT_BRAIN_BOOTSTRAP_PROMPT.md) nella root:
+
+```bash
+cp templates/PROJECT_BRAIN_BOOTSTRAP_PROMPT.md /percorso/progetto-esistente/
+```
+
+Poi, dalla sessione Codex aperta sul progetto, impartire soltanto:
+
+```text
+Leggi integralmente PROJECT_BRAIN_BOOTSTRAP_PROMPT.md ed esegui tutte le istruzioni. Fermati soltanto nei punti di gate umano indicati.
+```
+
+Il prompt impone inventario e migration map prima della sostituzione dei documenti, completa M00 per piccoli change set e lascia il gate `PENDING`. Le sezioni seguenti restano il percorso manuale o greenfield.
+
 ### 1. Creare il repository e copiare lo starter kit
 
 Dal repository Dritara:

@@ -29,6 +29,7 @@ I task `GOV.NNN` seguono ADR-004: sono owner-requested, documentali e non autori
 | ID | Stato | Outcome/deliverable | Dipendenze | DoD specifica |
 |---|---|---|---|---|
 | GOV.001 | done | Assessment teorico e Project Brain portabile | gate M01, richiesta owner | Assessment, guida, ADR e starter kit neutro presenti; indice/stato/handoff sincronizzati; checker e `make check` verdi. |
+| GOV.002 | done | Prompt brownfield autosufficiente per Codex | GOV.001, richiesta owner | Prompt copiabile copre sicurezza, inventario, M00, documenti, checker, Git, gate e brainstorming; guida/kit/checker sincronizzati e `make check` verde. |
 
 ## M02 — Dati e migrazioni SQLite
 
