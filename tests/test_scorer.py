@@ -9,20 +9,26 @@ Copre:
   - Sezioni corrette (section1, section2, section3, discarded)
 """
 
-from src.scorer import Scorer
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine
+
+from src.database import _seed_keywords
+from src.scorer import Scorer, build_scorer
 
 # ── Fixture ────────────────────────────────────────────────────
 
 
 def make_scorer() -> Scorer:
-    """Scorer costruito dal DB reale — usa le keyword attive."""
-    from src.database import get_session
-    from src.scorer import build_scorer
-
-    session = next(get_session())
-    scorer = build_scorer(session)
-    session.close()
-    return scorer
+    """Scorer costruito da un DB in-memory con il seed iniziale versionato."""
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_keywords(session)
+        return build_scorer(session)
 
 
 # ── Test blacklist ─────────────────────────────────────────────
