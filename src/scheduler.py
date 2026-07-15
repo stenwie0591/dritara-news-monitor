@@ -15,6 +15,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
+from src.config import RuntimeSettings, get_settings
 from src.database import get_session
 from src.deduplicator import Deduplicator
 from src.drive import upload_csv_giornaliero, upload_sqlite_backup
@@ -68,7 +69,10 @@ def _promote_fallback_section1(articles: list, max_promote: int = 2) -> None:
 
 
 # ── Job: fetch + score + notifica ─────────────────────────────
-async def job_fetch_and_notify() -> None:
+async def job_fetch_and_notify(
+    *, settings: RuntimeSettings | None = None
+) -> None:
+    runtime = (settings or get_settings()).validated_for_runtime()
     logger.info("=== JOB: fetch + score + notifica admin ===")
     today = date.today()
     session = next(get_session())
@@ -109,11 +113,11 @@ async def job_fetch_and_notify() -> None:
                     feed_level=a["feed_level"],
                     published_at=a.get("published_at"),
                     score=scored.score,
-                    score_detail=str(scored.score_detail),
                     section=scored.section,
-                    keyword_matches=str(scored.keyword_matches),
                     digest_date=today,
                 )
+                article.set_score_detail(scored.score_detail)
+                article.set_keyword_matches(scored.keyword_matches)
                 session.add(article)
                 saved += 1
 
@@ -229,7 +233,7 @@ async def job_fetch_and_notify() -> None:
 
         # Notifica admin con section1 + section2
         section1.sort(key=lambda x: x["score"], reverse=True)
-        await notify_admin(section1, today, articles_s2=section2)
+        await notify_admin(section1, today, articles_s2=section2, settings=runtime)
 
         # Upload CSV giornaliero su Drive
         from sqlmodel import select as sql_select_pq
@@ -258,12 +262,12 @@ async def job_fetch_and_notify() -> None:
             for a in all_relevant
         ]
 
-        upload_csv_giornaliero(articles_for_csv, today)
+        upload_csv_giornaliero(articles_for_csv, today, settings=runtime)
 
         # Alert immediato per feed con errori critici
         from src.sender_telegram import alert_feed_errors
 
-        await alert_feed_errors(errors)
+        await alert_feed_errors(errors, settings=runtime)
 
     except Exception as e:
         logger.error(f"Errore job fetch: {e}")
@@ -272,7 +276,10 @@ async def job_fetch_and_notify() -> None:
 
 
 # ── Job: pubblicazione oraria ──────────────────────────────────
-async def job_publish(hour: int) -> None:
+async def job_publish(
+    hour: int, *, settings: RuntimeSettings | None = None
+) -> None:
+    runtime = (settings or get_settings()).validated_for_runtime()
     logger.info(f"=== JOB: pubblicazione ore {hour}:00 ===")
 
     article = get_next_to_publish(date.today(), hour=hour)
@@ -281,7 +288,7 @@ async def job_publish(hour: int) -> None:
         return
 
     mark_publishing(article["queue_id"])
-    success = await publish_article(article)
+    success = await publish_article(article, settings=runtime)
     if success:
         mark_published(article["queue_id"])
         logger.info(f"Pubblicato alle {hour}:00: {article['title'][:60]}")
@@ -290,7 +297,9 @@ async def job_publish(hour: int) -> None:
 
 
 # ── Recovery stati orfani ──────────────────────────────────────
-async def job_recover_orphan_publishing() -> None:
+async def job_recover_orphan_publishing(
+    *, settings: RuntimeSettings | None = None
+) -> None:
     """
     Eseguito all'avvio: riporta a 'approved' qualsiasi articolo
     rimasto bloccato in stato 'publishing' a causa di un crash.
@@ -320,11 +329,10 @@ async def job_recover_orphan_publishing() -> None:
         session.commit()
         logger.info(f"Recovery publishing: {len(orfani)} articoli ripristinati")
 
-        import os
-
         from src.sender_telegram import _send
 
-        admin_id = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID", "0"))
+        runtime = (settings or get_settings()).validated_for_runtime()
+        admin_id = runtime.telegram_admin_chat_id or 0
         if admin_id:
             await _send(
                 admin_id,
@@ -334,6 +342,7 @@ async def job_recover_orphan_publishing() -> None:
                     f"(probabile crash precedente).\n"
                     f"Riportato/i ad `approved` — verrà pubblicato al prossimo slot orario."
                 ),
+                settings=runtime,
             )
 
     except Exception as e:
@@ -343,13 +352,16 @@ async def job_recover_orphan_publishing() -> None:
 
 
 # ── Recovery job saltati ───────────────────────────────────────
-async def job_startup_recovery() -> None:
+async def job_startup_recovery(
+    *, settings: RuntimeSettings | None = None
+) -> None:
     """
     Eseguito all'avvio: se il fetch di oggi non è ancora stato fatto
     (nessun articolo con digest_date = oggi), lo lancia immediatamente.
     Esegue anche il recovery degli stati publishing orfani.
     """
-    await job_recover_orphan_publishing()
+    runtime = (settings or get_settings()).validated_for_runtime()
+    await job_recover_orphan_publishing(settings=runtime)
 
     session = next(get_session())
     try:
@@ -361,7 +373,7 @@ async def job_startup_recovery() -> None:
         ).first()
         if not existing:
             logger.warning("Recovery: fetch di oggi non trovato — rilancio immediato")
-            await job_fetch_and_notify()
+            await job_fetch_and_notify(settings=runtime)
         else:
             logger.info("Recovery: fetch di oggi già presente — nessuna azione")
     except Exception as e:
@@ -410,13 +422,17 @@ async def job_cleanup_db() -> None:
 
 
 # ── Job: backup SQLite su Drive ────────────────────────────────
-async def job_backup_drive() -> None:
+async def job_backup_drive(
+    *, settings: RuntimeSettings | None = None
+) -> None:
     """Backup SQLite su Drive — eseguito ogni domenica alle 02:30."""
     from pathlib import Path
 
     logger.info("=== JOB: backup SQLite su Drive ===")
     db_path = Path("data/dritara.db")
-    file_id = upload_sqlite_backup(db_path, date.today())
+    file_id = upload_sqlite_backup(
+        db_path, date.today(), settings=settings or get_settings()
+    )
     if file_id:
         logger.info(f"Backup Drive completato: {file_id}")
     else:
@@ -424,7 +440,10 @@ async def job_backup_drive() -> None:
 
 
 # ── Setup scheduler ────────────────────────────────────────────
-def build_scheduler() -> AsyncIOScheduler:
+def build_scheduler(
+    settings: RuntimeSettings | None = None,
+) -> AsyncIOScheduler:
+    runtime = (settings or get_settings()).validated_for_runtime()
     scheduler = AsyncIOScheduler(timezone="Europe/Rome")
 
     scheduler.add_job(
@@ -432,6 +451,7 @@ def build_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=7, minute=0, timezone="Europe/Rome"),
         id="fetch_and_notify",
         name="Fetch + Notifica admin",
+        kwargs={"settings": runtime},
         replace_existing=True,
     )
 
@@ -440,6 +460,7 @@ def build_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=7, minute=5, timezone="Europe/Rome"),
         id="heartbeat",
         name="Heartbeat sistema",
+        kwargs={"settings": runtime},
         replace_existing=True,
     )
 
@@ -456,6 +477,7 @@ def build_scheduler() -> AsyncIOScheduler:
         CronTrigger(day_of_week="sun", hour=2, minute=30, timezone="Europe/Rome"),
         id="backup_drive",
         name="Backup SQLite su Drive",
+        kwargs={"settings": runtime},
         replace_existing=True,
     )
 
@@ -466,6 +488,7 @@ def build_scheduler() -> AsyncIOScheduler:
             id=f"publish_{hour}",
             name=f"Pubblicazione ore {hour}:00",
             args=[hour],
+            kwargs={"settings": runtime},
             replace_existing=True,
         )
 
@@ -474,6 +497,7 @@ def build_scheduler() -> AsyncIOScheduler:
         "date",
         id="startup_recovery",
         name="Recovery job saltati",
+        kwargs={"settings": runtime},
         replace_existing=True,
     )
 

@@ -1,9 +1,15 @@
 import json
-from datetime import date, datetime
+from ast import literal_eval
+from datetime import UTC, date, datetime
 from typing import Optional
 
-from sqlalchemy import Index
+from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
+
+
+def utc_now_naive() -> datetime:
+    """UTC senza tzinfo per compatibilità con lo schema SQLite esistente."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class FeedSource(SQLModel, table=True):
@@ -39,7 +45,7 @@ class Article(SQLModel, table=True):
     url: str
     excerpt: Optional[str] = None
     published_at: Optional[datetime] = None
-    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    fetched_at: datetime = Field(default_factory=utc_now_naive)
 
     # Scoring
     score: float = Field(default=0.0)
@@ -52,10 +58,20 @@ class Article(SQLModel, table=True):
     digest_date: Optional[date] = None
 
     def get_score_detail(self) -> dict:
-        return json.loads(self.score_detail)
+        try:
+            return json.loads(self.score_detail)
+        except json.JSONDecodeError:
+            # Compatibilità temporanea con record storici salvati via str(dict).
+            value = literal_eval(self.score_detail)
+            return value if isinstance(value, dict) else {}
 
     def get_keyword_matches(self) -> list:
-        return json.loads(self.keyword_matches)
+        try:
+            return json.loads(self.keyword_matches)
+        except json.JSONDecodeError:
+            # Compatibilità temporanea con record storici salvati via str(list).
+            value = literal_eval(self.keyword_matches)
+            return value if isinstance(value, list) else []
 
     def set_score_detail(self, data: dict):
         self.score_detail = json.dumps(data, ensure_ascii=False)
@@ -69,7 +85,7 @@ class DigestLog(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     digest_date: date = Field(index=True)
-    run_at: datetime = Field(default_factory=datetime.utcnow)
+    run_at: datetime = Field(default_factory=utc_now_naive)
 
     # Statistiche fetch
     feeds_attempted: int = Field(default=0)
@@ -104,13 +120,16 @@ class KeywordConfig(SQLModel, table=True):
     keyword: str
     weight: float
     active: bool = Field(default=True)
-    added_at: datetime = Field(default_factory=datetime.utcnow)
+    added_at: datetime = Field(default_factory=utc_now_naive)
 
 
 class PublishQueue(SQLModel, table=True):
     """Coda di pubblicazione articoli approvati dall'admin."""
 
     __table_args__ = (
+        UniqueConstraint(
+            "article_id", "digest_date", name="uq_publishqueue_article_digest"
+        ),
         Index("ix_publishqueue_status", "status"),
         Index("ix_publishqueue_status_date", "status", "digest_date"),
         Index("ix_publishqueue_published_at", "published_at"),
@@ -135,7 +154,7 @@ class KeywordWeightHistory(SQLModel, table=True):
     cluster: str
     peso_precedente: float
     peso_nuovo: float
-    modificato_at: datetime = Field(default_factory=datetime.utcnow)
+    modificato_at: datetime = Field(default_factory=utc_now_naive)
     motivo: str = Field(default="analisi_automatica")  # analisi_automatica | manuale
     applicato: bool = Field(default=True)  # False se rollback già eseguito
 
@@ -143,7 +162,9 @@ class KeywordWeightHistory(SQLModel, table=True):
 class FeedStats(SQLModel, table=True):
     """Statistiche giornaliere per feed — usate per monitoring e heartbeat."""
 
-    __table_args__ = (Index("ix_feedstats_feed_date", "feed_source_id", "fetch_date"),)
+    __table_args__ = (
+        Index("ix_feedstats_feed_date", "feed_source_id", "fetch_date"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     feed_source_id: int = Field(foreign_key="feedsource.id")

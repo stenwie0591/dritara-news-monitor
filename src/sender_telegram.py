@@ -1,27 +1,18 @@
-import os
 from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Optional
 
 import httpx
-from dotenv import load_dotenv
 from loguru import logger
 from sqlmodel import select
 
+from src.config import RuntimeSettings, get_settings
 from src.database import get_session
 from src.models import Article, PublishQueue
-
-load_dotenv()
-
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN_ID = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
-COMMUNITY_ID = int(os.getenv("TELEGRAM_COMMUNITY_CHAT_ID"))
-THREAD_ID = int(os.getenv("TELEGRAM_NEWS_THREAD_ID"))
-
-BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
+from src.telegram_renderer import HtmlFragment, TelegramMessage, telegram_renderer
 
 # Orari in ordine di priorità
-PUBLISH_HOURS = [18, 13, 9, 22]
+PUBLISH_HOURS = [9, 13, 18, 22]
 MAX_DAILY = 4
 MAX_DEFERRALS = 4
 
@@ -47,25 +38,35 @@ def _is_already_published(title: str, session, days: int = 7) -> bool:
 
 # ── API Telegram ───────────────────────────────────────────────
 async def _send(
-    chat_id: int, text: str, thread_id: Optional[int] = None
+    chat_id: int,
+    text: str | TelegramMessage,
+    thread_id: Optional[int] = None,
+    *,
+    settings: RuntimeSettings | None = None,
 ) -> Optional[int]:
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": False,
-    }
-    if thread_id:
-        payload["message_thread_id"] = thread_id
-
+    runtime = (settings or get_settings()).validated_for_runtime()
+    messages = [text] if isinstance(text, TelegramMessage) else telegram_renderer.plain_messages(text)
+    last_message_id: Optional[int] = None
     async with httpx.AsyncClient() as client:
-        r = await client.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10)
-        data = r.json()
-        if data.get("ok"):
-            return data["result"]["message_id"]
-        else:
-            logger.error(f"Telegram error: {data}")
-            return None
+        base_url = f"https://api.telegram.org/bot{runtime.telegram_token_value}"
+        for message in messages:
+            payload = {
+                "chat_id": chat_id,
+                "text": message.text,
+                "parse_mode": message.parse_mode,
+                "disable_web_page_preview": False,
+            }
+            if thread_id:
+                payload["message_thread_id"] = thread_id
+            response = await client.post(
+                f"{base_url}/sendMessage", json=payload, timeout=10
+            )
+            data = response.json()
+            if not data.get("ok"):
+                logger.error(f"Telegram error: {data}")
+                return None
+            last_message_id = data["result"]["message_id"]
+    return last_message_id
 
 
 # ── Notifica admin ─────────────────────────────────────────────
@@ -73,30 +74,51 @@ async def notify_admin(
     articles_s1: list[dict],
     digest_date: date,
     articles_s2: Optional[list[dict]] = None,
+    *,
+    settings: RuntimeSettings | None = None,
 ) -> None:
     """
     Manda all'admin la lista articoli del giorno.
     Ordine: deferred → section1 (🔴) → section2 top 5 (🟡)
     Max 1 articolo per feed sull'intera lista.
     """
+    runtime = (settings or get_settings()).validated_for_runtime()
+    admin_id = runtime.telegram_admin_chat_id or 0
     articles_s2 = articles_s2 or []
     deferred = _get_deferred_articles()
 
     if not articles_s1 and not articles_s2 and not deferred:
-        await _send(ADMIN_ID, "📭 Nessun articolo disponibile oggi.")
+        await _send(
+            admin_id,
+            telegram_renderer.message("📭 Nessun articolo disponibile oggi."),
+            settings=runtime,
+        )
         return
 
-    lines = []
-    lines.append(f"📋 *DRITARA — Articoli del {digest_date.strftime('%d/%m/%Y')}*")
+    lines: list[HtmlFragment] = []
     lines.append(
-        f"Rispondi con `/ok` seguito dai numeri (max {MAX_DAILY}), es: `/ok 1 3`\n"
+        telegram_renderer.join(
+            "📋 ",
+            telegram_renderer.bold(
+                f"DRITARA — Articoli del {digest_date.strftime('%d/%m/%Y')}"
+            ),
+        )
+    )
+    lines.append(
+        telegram_renderer.join(
+            "Rispondi con ",
+            telegram_renderer.code("/ok"),
+            f" seguito dai numeri (max {MAX_DAILY}), es: ",
+            telegram_renderer.code("/ok 1 3"),
+            "\n",
+        )
     )
 
     all_articles = []
 
     # ── Deferred ───────────────────────────────────────────────
     if deferred:
-        lines.append("*⏭️ In attesa dai giorni precedenti:*")
+        lines.append(telegram_renderer.bold("⏭️ In attesa dai giorni precedenti:"))
         for item in deferred:
             a = item["article"]
             count = item["deferred_count"]
@@ -105,8 +127,17 @@ async def notify_admin(
             )
             i = len(all_articles)
             lines.append(
-                f"*{i}.* [{a['title']}]({a['url']})\n"
-                f"   _{a['feed_name']} · score {a['score']:.1f} · rimandato {count}x_\n"
+                telegram_renderer.join(
+                    telegram_renderer.bold(f"{i}."),
+                    " ",
+                    telegram_renderer.link(a["title"], a["url"], label_limit=300),
+                    "\n   ",
+                    telegram_renderer.italic(
+                        f"{a['feed_name']} · score {a['score']:.1f} · rimandato {count}x",
+                        limit=400,
+                    ),
+                    "\n",
+                )
             )
 
     # ── Filtra già pubblicati + max 1 per feed ─────────────────
@@ -135,37 +166,48 @@ async def notify_admin(
     # ── Section1 🔴 ────────────────────────────────────────────
     if articles_s1:
         if deferred:
-            lines.append("*🆕 Nuovi di oggi:*")
-        lines.append("*🔴 Sud + Tech:*")
+            lines.append(telegram_renderer.bold("🆕 Nuovi di oggi:"))
+        lines.append(telegram_renderer.bold("🔴 Sud + Tech:"))
         for a in articles_s1:
             all_articles.append({"source": "new", **a})
             i = len(all_articles)
             lines.append(
-                f"*{i}.* [{a['title']}]({a['url']})\n"
-                f"   _{a['feed_name']} · score {a['score']:.1f}_\n"
+                telegram_renderer.join(
+                    telegram_renderer.bold(f"{i}."),
+                    " ",
+                    telegram_renderer.link(a["title"], a["url"], label_limit=300),
+                    "\n   ",
+                    telegram_renderer.italic(
+                        f"{a['feed_name']} · score {a['score']:.1f}", limit=400
+                    ),
+                    "\n",
+                )
             )
 
     # ── Section2 🟡 top 5 ──────────────────────────────────────
     if articles_s2:
-        lines.append("*🟡 Trend nazionali:*")
+        lines.append(telegram_renderer.bold("🟡 Trend nazionali:"))
         for a in articles_s2[:5]:
             all_articles.append({"source": "new", **a})
             i = len(all_articles)
             lines.append(
-                f"*{i}.* [{a['title']}]({a['url']})\n"
-                f"   _{a['feed_name']} · score {a['score']:.1f}_\n"
+                telegram_renderer.join(
+                    telegram_renderer.bold(f"{i}."),
+                    " ",
+                    telegram_renderer.link(a["title"], a["url"], label_limit=300),
+                    "\n   ",
+                    telegram_renderer.italic(
+                        f"{a['feed_name']} · score {a['score']:.1f}", limit=400
+                    ),
+                    "\n",
+                )
             )
 
     # ── Salva in pending ───────────────────────────────────────
     _save_pending(all_articles, digest_date)
 
-    text = "\n".join(lines)
-    if len(text) > 4096:
-        mid = text.rfind("\n", 0, 4096)
-        await _send(ADMIN_ID, text[:mid])
-        await _send(ADMIN_ID, text[mid:])
-    else:
-        await _send(ADMIN_ID, text)
+    for message in telegram_renderer.split_lines(lines):
+        await _send(admin_id, message, settings=runtime)
 
     logger.info(
         f"Notifica admin — {len(deferred)} deferred + "
@@ -174,7 +216,9 @@ async def notify_admin(
 
 
 # ── Pubblicazione nel topic ────────────────────────────────────
-async def publish_article(article: dict) -> bool:
+async def publish_article(
+    article: dict, *, settings: RuntimeSettings | None = None
+) -> bool:
     title = article.get("title", "")
     excerpt = article.get("excerpt", "")
     source = article.get("feed_name", "")
@@ -186,15 +230,29 @@ async def publish_article(article: dict) -> bool:
             excerpt[:200].rsplit(" ", 1)[0] + "…" if len(excerpt) > 200 else excerpt
         )
 
-    lines = []
-    lines.append(f"*{title}*")
+    lines: list[HtmlFragment] = []
+    lines.append(telegram_renderer.bold(title, limit=300))
     if short_excerpt:
-        lines.append(f"\n_{short_excerpt}_")
-    lines.append(f"\n[Leggi su {source}]({url})")
+        lines.append(telegram_renderer.italic(short_excerpt, limit=220))
+    lines.append(
+        telegram_renderer.link(f"Leggi su {source}", url, label_limit=400)
+    )
 
     # Avvisa admin prima di pubblicare nel topic
-    await _send(ADMIN_ID, f"📤 Sto pubblicando nel topic:\n*{title[:80]}*")
-    msg_id = await _send(COMMUNITY_ID, "\n".join(lines), thread_id=THREAD_ID)
+    runtime = (settings or get_settings()).validated_for_runtime()
+    admin_id = runtime.telegram_admin_chat_id or 0
+    community_id = runtime.telegram_community_chat_id or 0
+    thread_id = runtime.telegram_news_thread_id or 0
+    await _send(
+        admin_id,
+        telegram_renderer.message(
+            "📤 Sto pubblicando nel topic:\n",
+            telegram_renderer.bold(title, limit=80),
+        ),
+        settings=runtime,
+    )
+    message = telegram_renderer.split_lines(lines)[0]
+    msg_id = await _send(community_id, message, thread_id=thread_id, settings=runtime)
 
     if msg_id:
         logger.info(f"Pubblicato nel topic: {title[:60]}...")
@@ -269,6 +327,17 @@ def _save_pending(articles: list[dict], digest_date: date) -> None:
                 original.status = "pending"
                 session.add(original)
         else:
+            already_queued = session.exec(
+                select(PublishQueue).where(
+                    PublishQueue.article_id == a["id"],
+                    PublishQueue.digest_date == digest_date,
+                )
+            ).first()
+            if already_queued:
+                logger.warning(
+                    "Coda idempotente: articolo già presente per il digest corrente"
+                )
+                continue
             q = PublishQueue(
                 article_id=a["id"],
                 digest_date=digest_date,
@@ -411,13 +480,15 @@ def discard_articles(positions: list[int], digest_date: date) -> int:
     return discarded
 
 
-async def alert_feed_errors(feed_errors: list[dict]) -> None:
+async def alert_feed_errors(
+    feed_errors: list[dict], *, settings: RuntimeSettings | None = None
+) -> None:
     """
     Invia alert immediato all'admin per feed con errori critici
     (consecutive_errors >= 3).
     """
     session = next(get_session())
-    critical = []
+    critical: list[HtmlFragment] = []
 
     for fe in feed_errors:
         from src.models import FeedSource
@@ -427,8 +498,12 @@ async def alert_feed_errors(feed_errors: list[dict]) -> None:
         ).first()
         if source and source.consecutive_errors >= 3:
             critical.append(
-                f"• *{source.name}* — {source.consecutive_errors} errori consecutivi\n"
-                f"  `{fe['error'][:80]}`"
+                telegram_renderer.join(
+                    "• ",
+                    telegram_renderer.bold(source.name, limit=200),
+                    f" — {source.consecutive_errors} errori consecutivi\n  ",
+                    telegram_renderer.code(fe["error"], limit=80),
+                )
             )
 
     session.close()
@@ -436,7 +511,13 @@ async def alert_feed_errors(feed_errors: list[dict]) -> None:
     if not critical:
         return
 
-    lines = ["⚠️ *DRITARA — Alert feed critici*\n"]
+    lines: list[HtmlFragment] = [
+        telegram_renderer.join(
+            "⚠️ ", telegram_renderer.bold("DRITARA — Alert feed critici"), "\n"
+        )
+    ]
     lines.extend(critical)
-    await _send(ADMIN_ID, "\n".join(lines))
+    runtime = (settings or get_settings()).validated_for_runtime()
+    for message in telegram_renderer.split_lines(lines):
+        await _send(runtime.telegram_admin_chat_id or 0, message, settings=runtime)
     logger.warning(f"Alert inviato per {len(critical)} feed critici")

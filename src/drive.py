@@ -8,22 +8,25 @@ Funzioni:
 import csv
 import io
 import json
-import os
 from datetime import date
 from pathlib import Path
 
-from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from loguru import logger
 
-load_dotenv()
+from src.config import RuntimeSettings, get_settings
 
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 TOKEN_PATH = Path("token_drive.json")
-FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+
+
+def _safe_csv_cell(value) -> str:
+    """Neutralizza valori che un foglio di calcolo può eseguire come formule."""
+    text = "" if value is None else str(value)
+    return f"'{text}" if text.startswith(("=", "+", "-", "@")) else text
 
 
 def _get_drive_service():
@@ -54,6 +57,7 @@ def _get_drive_service():
             token_data["token"] = creds.token
             with open(TOKEN_PATH, "w") as f:
                 json.dump(token_data, f, indent=2)
+            TOKEN_PATH.chmod(0o600)
             logger.info("Token Drive rinnovato")
         else:
             raise RuntimeError(
@@ -64,12 +68,18 @@ def _get_drive_service():
     return build("drive", "v3", credentials=creds)
 
 
-def upload_csv_giornaliero(articles: list, today: date) -> str | None:
+def upload_csv_giornaliero(
+    articles: list,
+    today: date,
+    *,
+    settings: RuntimeSettings | None = None,
+) -> str | None:
     """
     Genera e carica su Drive il CSV degli articoli rilevanti del giorno.
     Ritorna il file ID Drive o None in caso di errore.
     """
-    if not FOLDER_ID:
+    folder_id = (settings or get_settings()).google_drive_folder_id
+    if not folder_id:
         logger.warning("GOOGLE_DRIVE_FOLDER_ID non configurato — skip upload CSV")
         return None
 
@@ -93,13 +103,13 @@ def upload_csv_giornaliero(articles: list, today: date) -> str | None:
             writer.writerow(
                 [
                     today.isoformat(),
-                    a.get("title", ""),
-                    a.get("url", ""),
-                    a.get("feed_name", ""),
-                    a.get("section", ""),
+                    _safe_csv_cell(a.get("title", "")),
+                    _safe_csv_cell(a.get("url", "")),
+                    _safe_csv_cell(a.get("feed_name", "")),
+                    _safe_csv_cell(a.get("section", "")),
                     a.get("score", 0),
-                    ", ".join(a.get("keyword_matches", [])),
-                    a.get("status", "pending"),
+                    _safe_csv_cell(", ".join(a.get("keyword_matches", []))),
+                    _safe_csv_cell(a.get("status", "pending")),
                 ]
             )
 
@@ -112,7 +122,7 @@ def upload_csv_giornaliero(articles: list, today: date) -> str | None:
         existing = (
             service.files()
             .list(
-                q=f"name='{filename}' and '{FOLDER_ID}' in parents and trashed=false",
+                q=f"name='{filename}' and '{folder_id}' in parents and trashed=false",
                 fields="files(id, name)",
             )
             .execute()
@@ -134,7 +144,7 @@ def upload_csv_giornaliero(articles: list, today: date) -> str | None:
             logger.info(f"CSV aggiornato su Drive: {filename}")
         else:
             # Crea nuovo file
-            metadata = {"name": filename, "parents": [FOLDER_ID]}
+            metadata = {"name": filename, "parents": [folder_id]}
             result = (
                 service.files()
                 .create(
@@ -154,13 +164,19 @@ def upload_csv_giornaliero(articles: list, today: date) -> str | None:
         return None
 
 
-def upload_sqlite_backup(db_path: Path, today: date) -> str | None:
+def upload_sqlite_backup(
+    db_path: Path,
+    today: date,
+    *,
+    settings: RuntimeSettings | None = None,
+) -> str | None:
     """
     Carica una copia del DB SQLite su Drive.
     Da chiamare solo la domenica.
     Ritorna il file ID Drive o None in caso di errore.
     """
-    if not FOLDER_ID:
+    folder_id = (settings or get_settings()).google_drive_folder_id
+    if not folder_id:
         logger.warning("GOOGLE_DRIVE_FOLDER_ID non configurato — skip backup SQLite")
         return None
 
@@ -181,7 +197,7 @@ def upload_sqlite_backup(db_path: Path, today: date) -> str | None:
             resumable=True,
         )
 
-        metadata = {"name": filename, "parents": [FOLDER_ID]}
+        metadata = {"name": filename, "parents": [folder_id]}
         result = (
             service.files()
             .create(

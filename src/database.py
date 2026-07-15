@@ -64,6 +64,7 @@ def _seed_feed_sources(session: Session) -> None:
             level=feed["level"],
             category=feed["category"],
             region=feed.get("region"),
+            active=feed.get("active", True),
         )
         session.add(source)
 

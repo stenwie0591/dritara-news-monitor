@@ -2,42 +2,32 @@
 monitor.py — Heartbeat e alert feed in errore.
 """
 
-import os
 from datetime import date, datetime, timedelta
 
-import httpx
-from dotenv import load_dotenv
 from loguru import logger
 from sqlmodel import select
 
+from src.config import RuntimeSettings, get_settings
 from src.database import get_session
 from src.models import Article, FeedSource, FeedStats
-
-load_dotenv()
-
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN_ID = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
-BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
+from src.sender_telegram import _send as _telegram_send
+from src.telegram_renderer import HtmlFragment, TelegramMessage, telegram_renderer
 
 # Feed con 0 articoli rilevanti per N giorni consecutivi → alert
 LOW_YIELD_DAYS = 3
 
 
-async def _send(text: str) -> None:
-    payload = {
-        "chat_id": ADMIN_ID,
-        "text": text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True,
-    }
-    async with httpx.AsyncClient() as client:
-        r = await client.post(f"{BASE_URL}/sendMessage", json=payload, timeout=10)
-        data = r.json()
-        if not data.get("ok"):
-            logger.error(f"Heartbeat send error: {data}")
+async def _send(
+    text: str | TelegramMessage, *, settings: RuntimeSettings | None = None
+) -> None:
+    runtime = (settings or get_settings()).validated_for_runtime()
+    await _telegram_send(
+        runtime.telegram_admin_chat_id or 0, text, settings=runtime
+    )
 
 
-async def send_heartbeat() -> None:
+async def send_heartbeat(*, settings: RuntimeSettings | None = None) -> None:
+    runtime = (settings or get_settings()).validated_for_runtime()
     today = date.today()
     session = next(get_session())
 
@@ -60,46 +50,81 @@ async def send_heartbeat() -> None:
         # Feed a bassa resa: 0 articoli rilevanti per LOW_YIELD_DAYS giorni consecutivi
         low_yield_feeds = _get_low_yield_feeds(session, today)
 
-        lines = []
+        lines: list[HtmlFragment] = []
 
         if ko == 0:
-            lines.append(f"🟢 *Sistema OK* — {ok}/{total} feed attivi")
+            lines.append(
+                telegram_renderer.join(
+                    "🟢 ", telegram_renderer.bold("Sistema OK"), f" — {ok}/{total} feed attivi"
+                )
+            )
         else:
             lines.append(
-                f"🟡 *Sistema parziale* — {ok}/{total} feed attivi, {ko} in errore"
+                telegram_renderer.join(
+                    "🟡 ",
+                    telegram_renderer.bold("Sistema parziale"),
+                    f" — {ok}/{total} feed attivi, {ko} in errore",
+                )
             )
 
         if s1 + s2 + s3 == 0:
             lines.append("📭 Nessun articolo rilevante oggi")
         else:
-            lines.append(f"📥 {s1 + s2 + s3} articoli rilevanti raccolti\n")
-            lines.append(f"🔴 Sezione 1 (Sud + Tech): {s1} articoli")
-            lines.append(f"🟡 Sezione 2 (Trend naz.): {s2} articoli")
-            lines.append(f"📋 Sezione 3 (In breve):   {s3} articoli")
+            lines.append(telegram_renderer.text(f"📥 {s1 + s2 + s3} articoli rilevanti raccolti\n"))
+            lines.append(telegram_renderer.text(f"🔴 Sezione 1 (Sud + Tech): {s1} articoli"))
+            lines.append(telegram_renderer.text(f"🟡 Sezione 2 (Trend naz.): {s2} articoli"))
+            lines.append(telegram_renderer.text(f"📋 Sezione 3 (In breve):   {s3} articoli"))
 
         if feeds_error:
-            lines.append(f"\n⚠️ *Feed in errore ({ko}):*")
+            lines.append(
+                telegram_renderer.join(
+                    "\n⚠️ ", telegram_renderer.bold(f"Feed in errore ({ko}):")
+                )
+            )
             for f in feeds_error:
                 consecutive = f.consecutive_errors or 0
                 error_msg = _get_last_error(f)
-                lines.append(f"• *{f.name}* ({consecutive} err consecutivi)")
-                lines.append(f"  `{error_msg}`")
+                lines.append(
+                    telegram_renderer.join(
+                        "• ",
+                        telegram_renderer.bold(f.name, limit=200),
+                        f" ({consecutive} err consecutivi)",
+                    )
+                )
+                lines.append(
+                    telegram_renderer.join("  ", telegram_renderer.code(error_msg, limit=200))
+                )
 
         if low_yield_feeds:
             lines.append(
-                f"\n📉 *Feed a bassa resa (0 articoli rilevanti per {LOW_YIELD_DAYS}+ giorni):*"
+                telegram_renderer.join(
+                    "\n📉 ",
+                    telegram_renderer.bold(
+                        f"Feed a bassa resa (0 articoli rilevanti per {LOW_YIELD_DAYS}+ giorni):"
+                    ),
+                )
             )
             for fname, n_days, avg_fetched in low_yield_feeds:
                 lines.append(
-                    f"• *{fname}* — {n_days} giorni senza rilevanti "
-                    f"(media {avg_fetched:.0f} articoli/giorno fetchati)"
+                    telegram_renderer.join(
+                        "• ",
+                        telegram_renderer.bold(fname, limit=200),
+                        f" — {n_days} giorni senza rilevanti "
+                        f"(media {avg_fetched:.0f} articoli/giorno fetchati)",
+                    )
                 )
 
         lines.append(
-            f"\n_📅 {today.strftime('%d/%m/%Y')} — {datetime.now().strftime('%H:%M')}_"
+            telegram_renderer.join(
+                "\n",
+                telegram_renderer.italic(
+                    f"📅 {today.strftime('%d/%m/%Y')} — {datetime.now().strftime('%H:%M')}"
+                ),
+            )
         )
 
-        await _send("\n".join(lines))
+        for message in telegram_renderer.split_lines(lines):
+            await _send(message, settings=runtime)
         logger.info(
             f"Heartbeat inviato — {ok}/{total} feed OK, "
             f"{s1 + s2 + s3} articoli, {len(low_yield_feeds)} feed a bassa resa"
@@ -107,7 +132,15 @@ async def send_heartbeat() -> None:
 
     except Exception as e:
         logger.error(f"Errore heartbeat: {e}")
-        await _send(f"❌ *Errore heartbeat*\n`{e}`")
+        await _send(
+            telegram_renderer.message(
+                "❌ ",
+                telegram_renderer.bold("Errore heartbeat"),
+                "\n",
+                telegram_renderer.code(e, limit=500),
+            ),
+            settings=runtime,
+        )
     finally:
         session.close()
 

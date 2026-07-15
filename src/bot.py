@@ -22,22 +22,23 @@ Comandi supportati:
 """
 
 import asyncio
-import os
 from collections import defaultdict
+from contextvars import ContextVar
 from datetime import date, timedelta
 from time import time
 
 import feedparser
 import httpx
-from dotenv import load_dotenv
 from loguru import logger
 
+from src.config import RuntimeSettings, get_settings
 from src.sender_telegram import (
     MAX_DAILY,
     PUBLISH_HOURS,
-    _send,
+    _send as _telegram_send,
     approve_articles,
 )
+from src.url_security import UnsafeFeedUrl, build_safe_http_client, get_public_feed
 
 # ── Rate limiting ──────────────────────────────────────────────
 RATE_LIMIT_SECONDS = 5
@@ -45,6 +46,9 @@ _last_command_time: dict = defaultdict(float)
 
 # Suggerimenti pendenti in attesa di /applica o /ignora
 _pending_suggestions: list = []
+_active_settings: ContextVar[RuntimeSettings | None] = ContextVar(
+    "bot_runtime_settings", default=None
+)
 
 
 def _is_rate_limited(chat_id: int) -> bool:
@@ -55,15 +59,44 @@ def _is_rate_limited(chat_id: int) -> bool:
     return False
 
 
-load_dotenv()
+def _admin_id(settings: RuntimeSettings | None = None) -> int:
+    """Risolve l'ID dal contesto iniettato; fallback solo per test/chiamate dirette."""
+    runtime = settings or _active_settings.get() or get_settings()
+    return runtime.telegram_admin_chat_id or 0
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN_ID = int(os.getenv("TELEGRAM_ADMIN_CHAT_ID"))
-BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
+
+def is_authorized_admin(update: dict, settings: RuntimeSettings) -> bool:
+    """Autorizza lo stesso principal per messaggi e callback, solo in chat privata."""
+    callback = update.get("callback_query") or {}
+    message = update.get("message") or callback.get("message") or {}
+    actor = update.get("message", {}).get("from") or callback.get("from") or {}
+    chat = message.get("chat") or {}
+    return (
+        chat.get("type") == "private"
+        and chat.get("id") == settings.telegram_admin_chat_id
+        and actor.get("id") == settings.telegram_admin_user_id
+    )
 
 
-async def run_bot() -> None:
+async def _send(
+    chat_id: int,
+    text: str,
+    thread_id: int | None = None,
+    *,
+    settings: RuntimeSettings | None = None,
+) -> int | None:
+    """Adapter compatibile per gli handler legacy con settings task-scoped."""
+    runtime = settings or _active_settings.get() or get_settings()
+    return await _telegram_send(
+        chat_id, text, thread_id=thread_id, settings=runtime
+    )
+
+
+async def run_bot(settings: RuntimeSettings | None = None) -> None:
     """Avvia il bot in long polling."""
+    runtime = (settings or get_settings()).validated_for_runtime()
+    _active_settings.set(runtime)
+    base_url = f"https://api.telegram.org/bot{runtime.telegram_token_value}"
     logger.info("Bot avviato — in ascolto comandi admin")
     offset = 0
 
@@ -71,7 +104,7 @@ async def run_bot() -> None:
         while True:
             try:
                 r = await client.get(
-                    f"{BASE_URL}/getUpdates",
+                    f"{base_url}/getUpdates",
                     params={
                         "offset": offset,
                         "timeout": 30,
@@ -81,7 +114,7 @@ async def run_bot() -> None:
                 updates = r.json().get("result", [])
                 for update in updates:
                     offset = update["update_id"] + 1
-                    await _handle(update)
+                    await _handle(update, settings=runtime)
             except asyncio.CancelledError:
                 logger.info("Bot interrotto")
                 break
@@ -90,12 +123,15 @@ async def run_bot() -> None:
                 await asyncio.sleep(5)
 
 
-async def _handle(update: dict) -> None:
+async def _handle(
+    update: dict, *, settings: RuntimeSettings | None = None
+) -> None:
+    runtime = settings or get_settings()
     msg = update.get("message", {})
     chat_id = msg.get("chat", {}).get("id")
     text = msg.get("text", "").strip()
 
-    if chat_id != ADMIN_ID:
+    if not is_authorized_admin(update, runtime):
         return
 
     if _is_rate_limited(chat_id):
@@ -103,7 +139,7 @@ async def _handle(update: dict) -> None:
 
     if text == "/start":
         await _send(
-            ADMIN_ID,
+            _admin_id(runtime),
             (
                 "👋 *Dritara Monitor attivo.*\n\n"
                 "Ogni mattina riceverai la lista degli articoli selezionati.\n\n"
@@ -126,6 +162,7 @@ async def _handle(update: dict) -> None:
                 "• `/feeddisable <id>` — disattiva feed\n"
                 "• `/feedenable <id>` — riattiva feed"
             ),
+            settings=runtime,
         )
     elif text.startswith("/ok"):
         await _handle_ok(text)
@@ -159,7 +196,7 @@ async def _handle(update: dict) -> None:
         await _handle_kwset(text)
     else:
         await _send(
-            ADMIN_ID,
+            _admin_id(),
             "Comando non riconosciuto. Usa `/start` per vedere tutti i comandi disponibili.",
         )
 
@@ -171,32 +208,32 @@ async def _handle_ok(text: str) -> None:
     parts = text.split()[1:]
 
     if not parts:
-        await _send(ADMIN_ID, "⚠️ Specifica i numeri degli articoli, es: `/ok 1 3`")
+        await _send(_admin_id(), "⚠️ Specifica i numeri degli articoli, es: `/ok 1 3`")
         return
 
     try:
         positions = [int(p) for p in parts]
     except ValueError:
         await _send(
-            ADMIN_ID, "⚠️ Numeri non validi. Usa solo numeri interi, es: `/ok 1 3`"
+            _admin_id(), "⚠️ Numeri non validi. Usa solo numeri interi, es: `/ok 1 3`"
         )
         return
 
     if len(positions) > MAX_DAILY:
         await _send(
-            ADMIN_ID, f"⚠️ Puoi approvare al massimo {MAX_DAILY} articoli al giorno."
+            _admin_id(), f"⚠️ Puoi approvare al massimo {MAX_DAILY} articoli al giorno."
         )
         positions = positions[:MAX_DAILY]
 
     approved = approve_articles(positions, date.today())
 
     if approved == 0:
-        await _send(ADMIN_ID, "⚠️ Nessun articolo trovato per le posizioni indicate.")
+        await _send(_admin_id(), "⚠️ Nessun articolo trovato per le posizioni indicate.")
         return
 
     orari = [f"{PUBLISH_HOURS[i]}:00" for i in range(approved)]
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         (
             f"✅ *{approved} articoli approvati.*\n"
             f"Pubblicazione prevista: {' · '.join(orari)}\n"
@@ -244,10 +281,10 @@ async def _handle_status() -> None:
     session.close()
 
     if not queue:
-        await _send(ADMIN_ID, "📭 Nessun articolo in coda per oggi.")
+        await _send(_admin_id(), "📭 Nessun articolo in coda per oggi.")
         return
 
-    await _send(ADMIN_ID, "\n".join(lines))
+    await _send(_admin_id(), "\n".join(lines))
 
 
 async def _handle_scarta(text: str) -> None:
@@ -256,25 +293,25 @@ async def _handle_scarta(text: str) -> None:
     parts = text.split()[1:]
 
     if not parts:
-        await _send(ADMIN_ID, "⚠️ Specifica i numeri degli articoli, es: `/scarta 2 4`")
+        await _send(_admin_id(), "⚠️ Specifica i numeri degli articoli, es: `/scarta 2 4`")
         return
 
     try:
         positions = [int(p) for p in parts]
     except ValueError:
         await _send(
-            ADMIN_ID, "⚠️ Numeri non validi. Usa solo numeri interi, es: `/scarta 2 4`"
+            _admin_id(), "⚠️ Numeri non validi. Usa solo numeri interi, es: `/scarta 2 4`"
         )
         return
 
     discarded = discard_articles(positions, date.today())
 
     if discarded == 0:
-        await _send(ADMIN_ID, "⚠️ Nessun articolo trovato per le posizioni indicate.")
+        await _send(_admin_id(), "⚠️ Nessun articolo trovato per le posizioni indicate.")
         return
 
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         (
             f"🗑️ *{discarded} articoli scartati.*\n"
             f"Non verranno pubblicati né riproposti nei giorni successivi."
@@ -298,7 +335,7 @@ async def _handle_feedlist() -> None:
     ).all()
 
     if not feeds:
-        await _send(ADMIN_ID, "📭 Nessun feed configurato.")
+        await _send(_admin_id(), "📭 Nessun feed configurato.")
         session.close()
         return
 
@@ -339,7 +376,7 @@ async def _handle_feedlist() -> None:
         lines.append(f"{stato} `[{f.id}]` *{f.name}* — {stats_str}")
 
     lines.append("\n_Usa `/feeddisable <id>` o `/feedenable <id>` per gestire i feed._")
-    await _send(ADMIN_ID, "\n".join(lines))
+    await _send(_admin_id(), "\n".join(lines))
 
 
 async def _handle_feedadd(text: str) -> None:
@@ -347,17 +384,18 @@ async def _handle_feedadd(text: str) -> None:
     from src.database import get_session
     from src.models import FeedSource
 
-    parts = text.split(maxsplit=3)
+    parts = text.split()
     if len(parts) < 4:
         await _send(
-            ADMIN_ID,
+            _admin_id(),
             "⚠️ Sintassi: `/feedadd <url> <nome> <livello>`\n"
             "Esempio: `/feedadd https://example.com/rss.xml Example Feed 2`",
         )
         return
 
-    _, url, nome, livello_str = parts
-    livello_str = livello_str.strip()
+    url = parts[1]
+    nome = " ".join(parts[2:-1]).strip()
+    livello_str = parts[-1]
 
     # Valida livello
     try:
@@ -365,24 +403,30 @@ async def _handle_feedadd(text: str) -> None:
         if livello not in (1, 2, 3):
             raise ValueError
     except ValueError:
-        await _send(ADMIN_ID, "⚠️ Il livello deve essere 1, 2 o 3.")
+        await _send(_admin_id(), "⚠️ Il livello deve essere 1, 2 o 3.")
         return
 
     # Verifica che il feed RSS sia valido
-    await _send(ADMIN_ID, f"🔄 Verifico il feed `{url}`...")
+    await _send(_admin_id(), f"🔄 Verifico il feed `{url}`...")
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url, follow_redirects=True)
+        async with build_safe_http_client(timeout=10) as client:
+            r = await get_public_feed(client, url, timeout=10)
             r.raise_for_status()
             parsed = feedparser.parse(r.text)
             if parsed.bozo and not parsed.entries:
                 await _send(
-                    ADMIN_ID, f"⚠️ URL non riconosciuto come feed RSS valido.\n`{url}`"
+                    _admin_id(), f"⚠️ URL non riconosciuto come feed RSS valido.\n`{url}`"
                 )
                 return
             n_entries = len(parsed.entries)
+    except UnsafeFeedUrl:
+        await _send(
+            _admin_id(),
+            "⚠️ Feed rifiutato dalla policy di sicurezza di rete.",
+        )
+        return
     except Exception as e:
-        await _send(ADMIN_ID, f"⚠️ Impossibile raggiungere il feed:\n`{e}`")
+        await _send(_admin_id(), f"⚠️ Impossibile raggiungere il feed:\n`{e}`")
         return
 
     # Salva nel DB
@@ -392,7 +436,7 @@ async def _handle_feedadd(text: str) -> None:
 
         existing = session.exec(select(FeedSource).where(FeedSource.url == url)).first()
         if existing:
-            await _send(ADMIN_ID, f"⚠️ Feed già presente nel DB con id `{existing.id}`.")
+            await _send(_admin_id(), f"⚠️ Feed già presente nel DB con id `{existing.id}`.")
             session.close()
             return
 
@@ -400,6 +444,7 @@ async def _handle_feedadd(text: str) -> None:
             name=nome,
             url=url,
             level=livello,
+            category="locale" if livello == 3 else "generalista",
             active=True,
         )
         session.add(feed)
@@ -407,13 +452,13 @@ async def _handle_feedadd(text: str) -> None:
         session.refresh(feed)
         feed_id = feed.id
     except Exception as e:
-        await _send(ADMIN_ID, f"⚠️ Errore salvataggio: `{e}`")
+        await _send(_admin_id(), f"⚠️ Errore salvataggio: `{e}`")
         session.close()
         return
     session.close()
 
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         (
             f"✅ *Feed aggiunto con successo.*\n"
             f"ID: `{feed_id}` | Nome: *{nome}* | Livello: {livello}\n"
@@ -431,25 +476,25 @@ async def _handle_feeddisable(text: str) -> None:
 
     parts = text.split()
     if len(parts) < 2:
-        await _send(ADMIN_ID, "⚠️ Sintassi: `/feeddisable <id>`")
+        await _send(_admin_id(), "⚠️ Sintassi: `/feeddisable <id>`")
         return
 
     try:
         feed_id = int(parts[1])
     except ValueError:
-        await _send(ADMIN_ID, "⚠️ L'ID deve essere un numero intero.")
+        await _send(_admin_id(), "⚠️ L'ID deve essere un numero intero.")
         return
 
     session = next(get_session())
     feed = session.get(FeedSource, feed_id)
 
     if not feed:
-        await _send(ADMIN_ID, f"⚠️ Nessun feed trovato con id `{feed_id}`.")
+        await _send(_admin_id(), f"⚠️ Nessun feed trovato con id `{feed_id}`.")
         session.close()
         return
 
     if not feed.active:
-        await _send(ADMIN_ID, f"⚠️ Il feed *{feed.name}* è già disattivato.")
+        await _send(_admin_id(), f"⚠️ Il feed *{feed.name}* è già disattivato.")
         session.close()
         return
 
@@ -460,7 +505,7 @@ async def _handle_feeddisable(text: str) -> None:
     session.close()
 
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         f"🔴 Feed *{nome}* disattivato.\n_Usa `/feedenable {feed_id}` per riattivarlo._",
     )
     logger.info(f"Feed disattivato: {nome} (id={feed_id})")
@@ -473,25 +518,25 @@ async def _handle_feedenable(text: str) -> None:
 
     parts = text.split()
     if len(parts) < 2:
-        await _send(ADMIN_ID, "⚠️ Sintassi: `/feedenable <id>`")
+        await _send(_admin_id(), "⚠️ Sintassi: `/feedenable <id>`")
         return
 
     try:
         feed_id = int(parts[1])
     except ValueError:
-        await _send(ADMIN_ID, "⚠️ L'ID deve essere un numero intero.")
+        await _send(_admin_id(), "⚠️ L'ID deve essere un numero intero.")
         return
 
     session = next(get_session())
     feed = session.get(FeedSource, feed_id)
 
     if not feed:
-        await _send(ADMIN_ID, f"⚠️ Nessun feed trovato con id `{feed_id}`.")
+        await _send(_admin_id(), f"⚠️ Nessun feed trovato con id `{feed_id}`.")
         session.close()
         return
 
     if feed.active:
-        await _send(ADMIN_ID, f"⚠️ Il feed *{feed.name}* è già attivo.")
+        await _send(_admin_id(), f"⚠️ Il feed *{feed.name}* è già attivo.")
         session.close()
         return
 
@@ -502,7 +547,7 @@ async def _handle_feedenable(text: str) -> None:
     session.close()
 
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         f"🟢 Feed *{nome}* riattivato.\n_Sarà incluso dal prossimo fetch delle 07:00._",
     )
     logger.info(f"Feed riattivato: {nome} (id={feed_id})")
@@ -526,7 +571,7 @@ async def _handle_kwlist() -> None:
     session.close()
 
     if not keywords:
-        await _send(ADMIN_ID, "📭 Nessuna keyword configurata.")
+        await _send(_admin_id(), "📭 Nessuna keyword configurata.")
         return
 
     cluster_labels = {
@@ -548,7 +593,7 @@ async def _handle_kwlist() -> None:
         lines.append("")
 
     lines.append("_Comandi: `/kwadd`, `/kwremove`, `/kwset`_")
-    await _send(ADMIN_ID, "\n".join(lines))
+    await _send(_admin_id(), "\n".join(lines))
 
 
 async def _handle_kwadd(text: str) -> None:
@@ -560,7 +605,7 @@ async def _handle_kwadd(text: str) -> None:
     parts = text.split(maxsplit=3)
     if len(parts) < 4:
         await _send(
-            ADMIN_ID,
+            _admin_id(),
             "⚠️ Sintassi: `/kwadd <cluster> <peso> <keyword>`\n"
             "Esempio: `/kwadd B 1.5 robotica`\n"
             "Cluster validi: A, B, C",
@@ -572,7 +617,7 @@ async def _handle_kwadd(text: str) -> None:
     keyword = keyword.strip().lower()
 
     if cluster not in ("A", "B", "C"):
-        await _send(ADMIN_ID, "⚠️ Cluster non valido. Usa A, B o C.")
+        await _send(_admin_id(), "⚠️ Cluster non valido. Usa A, B o C.")
         return
 
     try:
@@ -580,7 +625,7 @@ async def _handle_kwadd(text: str) -> None:
         if not (0.5 <= peso <= 3.0):
             raise ValueError
     except ValueError:
-        await _send(ADMIN_ID, "⚠️ Il peso deve essere un numero tra 0.5 e 3.0.")
+        await _send(_admin_id(), "⚠️ Il peso deve essere un numero tra 0.5 e 3.0.")
         return
 
     session = next(get_session())
@@ -591,7 +636,7 @@ async def _handle_kwadd(text: str) -> None:
     if existing:
         if existing.active:
             await _send(
-                ADMIN_ID,
+                _admin_id(),
                 f"⚠️ La keyword `{keyword}` esiste già nel cluster {existing.cluster} con peso {existing.weight}.",
             )
         else:
@@ -601,7 +646,7 @@ async def _handle_kwadd(text: str) -> None:
             session.add(existing)
             session.commit()
             await _send(
-                ADMIN_ID,
+                _admin_id(),
                 f"✅ Keyword `{keyword}` riattivata nel cluster {cluster} con peso {peso}.",
             )
         session.close()
@@ -618,7 +663,7 @@ async def _handle_kwadd(text: str) -> None:
     session.close()
 
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         (
             f"✅ *Keyword aggiunta.*\n"
             f"`{keyword}` — Cluster {cluster} — peso {peso}\n"
@@ -637,7 +682,7 @@ async def _handle_kwremove(text: str) -> None:
     parts = text.split(maxsplit=1)
     if len(parts) < 2:
         await _send(
-            ADMIN_ID, "⚠️ Sintassi: `/kwremove <keyword>`\nEsempio: `/kwremove robotica`"
+            _admin_id(), "⚠️ Sintassi: `/kwremove <keyword>`\nEsempio: `/kwremove robotica`"
         )
         return
 
@@ -649,7 +694,7 @@ async def _handle_kwremove(text: str) -> None:
     ).first()
 
     if not kw:
-        await _send(ADMIN_ID, f"⚠️ Keyword `{keyword}` non trovata.")
+        await _send(_admin_id(), f"⚠️ Keyword `{keyword}` non trovata.")
         session.close()
         return
 
@@ -660,7 +705,7 @@ async def _handle_kwremove(text: str) -> None:
     session.close()
 
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         (
             f"🗑️ *Keyword rimossa definitivamente.*\n"
             f"`{keyword}` — Cluster {cluster} — peso {peso}\n"
@@ -679,7 +724,7 @@ async def _handle_kwset(text: str) -> None:
     parts = text.split()
     if len(parts) < 3:
         await _send(
-            ADMIN_ID,
+            _admin_id(),
             "⚠️ Sintassi: `/kwset <keyword> <nuovo_peso>`\nEsempio: `/kwset robotica 2.0`",
         )
         return
@@ -693,7 +738,7 @@ async def _handle_kwset(text: str) -> None:
         if not (0.5 <= nuovo_peso <= 3.0):
             raise ValueError
     except ValueError:
-        await _send(ADMIN_ID, "⚠️ Il peso deve essere un numero tra 0.5 e 3.0.")
+        await _send(_admin_id(), "⚠️ Il peso deve essere un numero tra 0.5 e 3.0.")
         return
 
     session = next(get_session())
@@ -704,7 +749,7 @@ async def _handle_kwset(text: str) -> None:
     ).first()
 
     if not kw:
-        await _send(ADMIN_ID, f"⚠️ Keyword `{keyword}` non trovata o non attiva.")
+        await _send(_admin_id(), f"⚠️ Keyword `{keyword}` non trovata o non attiva.")
         session.close()
         return
 
@@ -712,7 +757,7 @@ async def _handle_kwset(text: str) -> None:
     cluster = kw.cluster  # salva prima che la sessione si chiuda
 
     if vecchio_peso == nuovo_peso:
-        await _send(ADMIN_ID, f"⚠️ Il peso di `{keyword}` è già {nuovo_peso}.")
+        await _send(_admin_id(), f"⚠️ Il peso di `{keyword}` è già {nuovo_peso}.")
         session.close()
         return
 
@@ -735,7 +780,7 @@ async def _handle_kwset(text: str) -> None:
 
     freccia = "⬆️" if nuovo_peso > vecchio_peso else "⬇️"
     await _send(
-        ADMIN_ID,
+        _admin_id(),
         (
             f"{freccia} *Peso aggiornato.*\n"
             f"`{keyword}` — Cluster {cluster}: {vecchio_peso} → {nuovo_peso}\n"
@@ -778,7 +823,7 @@ async def _handle_analisi() -> None:
 
     if n_approvati + n_scartati < 5:
         await _send(
-            ADMIN_ID,
+            _admin_id(),
             (
                 "📊 *Analisi keyword — ultima settimana*\n\n"
                 f"Dati insufficienti: solo {n_approvati} approvati e {n_scartati} scartati.\n"
@@ -798,7 +843,7 @@ async def _handle_analisi() -> None:
         ).all()
         for art in articles:
             if art.keyword_matches:
-                for kw in art.keyword_matches:
+                for kw in art.get_keyword_matches():
                     counts[kw.lower()] += 1
         return counts
 
@@ -886,7 +931,7 @@ async def _handle_analisi() -> None:
 
     if not suggerimenti:
         lines.append("💡 *Nessun suggerimento:* i pesi attuali sembrano bilanciati.")
-        await _send(ADMIN_ID, "\n".join(lines))
+        await _send(_admin_id(), "\n".join(lines))
         return
 
     lines.append("💡 *SUGGERIMENTI:*")
@@ -908,7 +953,7 @@ async def _handle_analisi() -> None:
     lines.append("Rispondi `/applica` per confermare o `/ignora` per scartare.")
 
     _pending_suggestions = suggerimenti
-    await _send(ADMIN_ID, "\n".join(lines))
+    await _send(_admin_id(), "\n".join(lines))
     logger.info(f"Analisi keyword inviata — {len(suggerimenti)} suggerimenti")
 
 
@@ -917,7 +962,7 @@ async def _handle_applica() -> None:
 
     if not _pending_suggestions:
         await _send(
-            ADMIN_ID, "⚠️ Nessun suggerimento pendente. Lancia prima `/analisi`."
+            _admin_id(), "⚠️ Nessun suggerimento pendente. Lancia prima `/analisi`."
         )
         return
 
@@ -962,7 +1007,7 @@ async def _handle_applica() -> None:
 
     if not applicati:
         await _send(
-            ADMIN_ID, "⚠️ Nessuna modifica applicata — keyword non trovate nel DB."
+            _admin_id(), "⚠️ Nessuna modifica applicata — keyword non trovate nel DB."
         )
         return
 
@@ -973,7 +1018,7 @@ async def _handle_applica() -> None:
         "_Le nuove soglie saranno attive dal prossimo fetch._",
         "_Usa `/rollback` per annullare queste modifiche._",
     ]
-    await _send(ADMIN_ID, "\n".join(lines))
+    await _send(_admin_id(), "\n".join(lines))
     logger.info(f"Applicati {len(applicati)} aggiornamenti keyword")
 
 
@@ -981,13 +1026,13 @@ async def _handle_ignora() -> None:
     global _pending_suggestions
 
     if not _pending_suggestions:
-        await _send(ADMIN_ID, "⚠️ Nessun suggerimento pendente.")
+        await _send(_admin_id(), "⚠️ Nessun suggerimento pendente.")
         return
 
     n = len(_pending_suggestions)
     _pending_suggestions = []
     await _send(
-        ADMIN_ID, f"🚫 *{n} suggerimenti ignorati.* I pesi rimangono invariati."
+        _admin_id(), f"🚫 *{n} suggerimenti ignorati.* I pesi rimangono invariati."
     )
     logger.info("Suggerimenti keyword ignorati dall'admin")
 
@@ -1007,7 +1052,7 @@ async def _handle_rollback() -> None:
     ).first()
 
     if not ultima:
-        await _send(ADMIN_ID, "⚠️ Nessuna modifica precedente da annullare.")
+        await _send(_admin_id(), "⚠️ Nessuna modifica precedente da annullare.")
         session.close()
         return
 
@@ -1040,7 +1085,7 @@ async def _handle_rollback() -> None:
     session.close()
 
     if not ripristinati:
-        await _send(ADMIN_ID, "⚠️ Nessuna modifica da annullare.")
+        await _send(_admin_id(), "⚠️ Nessuna modifica da annullare.")
         return
 
     lines = [
@@ -1049,5 +1094,5 @@ async def _handle_rollback() -> None:
         "",
         "_I pesi originali sono stati ripristinati._",
     ]
-    await _send(ADMIN_ID, "\n".join(lines))
+    await _send(_admin_id(), "\n".join(lines))
     logger.info(f"Rollback eseguito — {len(ripristinati)} keyword ripristinate")

@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 import feedparser
@@ -9,10 +9,14 @@ from sqlmodel import Session
 
 from src.database import get_active_feeds
 from src.models import FeedSource
+from src.url_security import FetchBudget, build_safe_http_client, get_public_feed
 
 # ── Costanti ───────────────────────────────────────────────────
 TIMEOUT = 15
 MAX_CONCURRENT = 10
+MAX_ENTRIES_PER_FEED = 200
+MAX_TITLE_CHARS = 500
+MAX_ARTICLE_URL_CHARS = 2048
 USER_AGENT = "Mozilla/5.0 (compatible; DritaraBot/1.0; +https://dritara.tech)"
 
 
@@ -20,27 +24,27 @@ USER_AGENT = "Mozilla/5.0 (compatible; DritaraBot/1.0; +https://dritara.tech)"
 async def fetch_feed(
     client: httpx.AsyncClient,
     source: FeedSource,
+    *,
+    budget: FetchBudget | None = None,
 ) -> tuple[FeedSource, list[dict], Optional[str]]:
     """
     Fetcha un singolo feed RSS.
     Ritorna (source, articoli_grezzi, errore_o_None).
     """
     try:
-        response = await client.get(
-            source.url,
-            timeout=TIMEOUT,
-            follow_redirects=True,
+        response = await get_public_feed(
+            client, source.url, timeout=TIMEOUT, budget=budget
         )
         response.raise_for_status()
 
         parsed = feedparser.parse(response.text)
         articles = []
 
-        for entry in parsed.entries:
-            title = _clean(getattr(entry, "title", ""))
+        for entry in parsed.entries[:MAX_ENTRIES_PER_FEED]:
+            title = _clean(getattr(entry, "title", ""))[:MAX_TITLE_CHARS]
             url = _clean(getattr(entry, "link", ""))
 
-            if not title or not url:
+            if not title or not url or len(url) > MAX_ARTICLE_URL_CHARS:
                 continue
 
             excerpt = _extract_excerpt(entry)
@@ -81,21 +85,21 @@ async def fetch_all_feeds(
     logger.info(f"Fetch avviato — {len(sources)} feed attivi")
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    budget = FetchBudget()
     all_articles = []
     feed_errors = []
 
     async def bounded_fetch(client, source):
         async with semaphore:
-            return await fetch_feed(client, source)
+            return await fetch_feed(client, source, budget=budget)
 
-    async with httpx.AsyncClient(
-        headers={"User-Agent": USER_AGENT},
-        follow_redirects=True,
+    async with build_safe_http_client(
+        headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT
     ) as client:
         tasks = [bounded_fetch(client, src) for src in sources]
         results = await asyncio.gather(*tasks, return_exceptions=False)
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     for source, articles, error in results:
         # Aggiorna statistiche fonte nel DB

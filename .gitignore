@@ -16,3 +16,5 @@ venv/
 
 # Docker
 *.log
+credentials_oauth.json
+token_drive.json

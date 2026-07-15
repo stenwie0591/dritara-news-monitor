@@ -10,7 +10,7 @@ Copre i nuovi comandi feed e keyword (nessuna rete, DB in-memory):
   - _handle_kwset: modifica peso, salva history, peso invariato
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -121,16 +121,20 @@ async def test_feedadd_feed_duplicato(session):
     make_feed(session, url="https://example.com/rss")
 
     with patch_session(session), patch_send() as mock_send:
-        with patch("src.bot.httpx.AsyncClient") as mock_client:
+        with patch("src.bot.httpx.AsyncClient"):
             mock_resp = AsyncMock()
-            mock_resp.raise_for_status = AsyncMock()
+            mock_resp.raise_for_status = Mock()
             mock_resp.text = (
                 "<rss><channel><item><title>Test</title></item></channel></rss>"
             )
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                return_value=mock_resp
-            )
-            with patch("src.bot.feedparser.parse") as mock_parse:
+            with (
+                patch(
+                    "src.bot.get_public_feed",
+                    new_callable=AsyncMock,
+                    return_value=mock_resp,
+                ),
+                patch("src.bot.feedparser.parse") as mock_parse,
+            ):
                 mock_parse.return_value.bozo = False
                 mock_parse.return_value.entries = [{"title": "Test"}]
                 from src.bot import _handle_feedadd
@@ -144,13 +148,15 @@ async def test_feedadd_feed_duplicato(session):
 @pytest.mark.asyncio
 async def test_feedadd_fetch_fallito(session):
     with patch_session(session), patch_send() as mock_send:
-        with patch("src.bot.httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                side_effect=Exception("timeout")
-            )
-            from src.bot import _handle_feedadd
+        with patch("src.bot.httpx.AsyncClient"):
+            with patch(
+                "src.bot.get_public_feed",
+                new_callable=AsyncMock,
+                side_effect=Exception("timeout"),
+            ):
+                from src.bot import _handle_feedadd
 
-            await _handle_feedadd("/feedadd https://nonexistent.com/rss Nome 2")
+                await _handle_feedadd("/feedadd https://nonexistent.com/rss Nome 2")
 
     testo = mock_send.call_args[0][1]
     assert "Impossibile" in testo
