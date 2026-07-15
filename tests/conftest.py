@@ -17,7 +17,8 @@ def pytest_runtest_logreport(report) -> None:
     if os.environ.get("GITHUB_ACTIONS") != "true" or not report.failed:
         return
     path, line_index, test_name = report.location
-    print(
+    annotation = (
         f"::error file={_workflow_escape(path)},line={line_index + 1},"
-        f"title={_workflow_escape(test_name)}::{_workflow_escape(report.longrepr)}"
+        f"title={_workflow_escape(test_name)}::{_workflow_escape(report.longrepr)}\n"
     )
+    os.write(1, annotation.encode("utf-8"))
