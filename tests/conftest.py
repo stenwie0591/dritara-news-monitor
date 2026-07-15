@@ -15,10 +15,12 @@ def _workflow_escape(value: object) -> str:
 def _emit_failure(report) -> None:
     if os.environ.get("GITHUB_ACTIONS") != "true" or not report.failed:
         return
-    path, line_index, test_name = report.location
+    location = getattr(report, "location", None) or ("tests", 0, "pytest")
+    path, line_index, _test_name = location
+    line_number = line_index + 1 if isinstance(line_index, int) else 1
     annotation = (
-        f"::error file={_workflow_escape(path)},line={line_index + 1},"
-        f"title={_workflow_escape(test_name)}::{_workflow_escape(report.longrepr)}\n"
+        f"::error file={_workflow_escape(path)},line={line_number},title=pytest::"
+        f"{_workflow_escape(report.longrepr)}\n"
     )
     os.write(1, annotation.encode("utf-8"))
 
