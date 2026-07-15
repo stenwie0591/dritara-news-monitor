@@ -1,5 +1,9 @@
 # Dritara News Monitor
 
+> Technical source of truth for maintainers and AI agents: [`docs/README.md`](docs/README.md). The root README is an onboarding overview; verified AS-IS, accepted decisions and TO-BE are kept separate in the Project Brain.
+>
+> Delivery is governed by the [Dritara Evidence-Gated framework](docs/governance/delivery-framework.md): small micro-tasks, explicit DoD and a human evidence gate before the next macro-task.
+
 > **EN** | [Italiano](#italiano) below
 >
 > An automated news monitoring system built by [Dritara](https://dritara.it) — a media brand covering tech and digital innovation in Southern Italy and Europe.
@@ -21,7 +25,7 @@ RSS Feeds (30+)
       ↓
   Fetcher — collects raw articles
       ↓
-  Deduplicator — removes duplicates by title similarity (last 7 days)
+  Deduplicator — removes duplicates inside the current fetch batch
       ↓
   Scorer — assigns relevance score using keyword clusters:
             Cluster A (Geography: Southern Italy)
@@ -41,7 +45,7 @@ RSS Feeds (30+)
 
 - **Automated fetching** of 30+ Italian RSS feeds (national and local)
 - **Keyword-based scorer** with geographic and thematic clusters, territorial boost, proximity check, boilerplate blacklist
-- **Deduplication** across feeds and publishing history (last 7 days)
+- **Deduplication** across feeds in the current batch, plus a pre-notification check against recently published titles
 - **Editorial control** via Telegram bot — approve, discard, defer articles
 - **Fallback system** — if Section 1 is empty, best Section 2 articles with territorial match are promoted automatically
 - **Max 1 article per feed** in the daily admin list to avoid source concentration
@@ -89,7 +93,8 @@ cp .env.example .env
 | Variable                     | Description                    |
 | ---------------------------- | ------------------------------ |
 | `TELEGRAM_BOT_TOKEN`         | Bot token from @BotFather      |
-| `TELEGRAM_ADMIN_CHAT_ID`     | Admin Telegram user ID         |
+| `TELEGRAM_ADMIN_CHAT_ID`     | Private admin chat ID          |
+| `TELEGRAM_ADMIN_USER_ID`     | Admin user ID (target hardened authorization) |
 | `TELEGRAM_COMMUNITY_CHAT_ID` | Community group ID             |
 | `TELEGRAM_NEWS_THREAD_ID`    | Topic thread ID for publishing |
 | `GOOGLE_DRIVE_FOLDER_ID`     | Drive folder ID for exports    |
@@ -136,18 +141,7 @@ cp .env.example .env
 
 ### Deployment (Raspberry Pi)
 
-```bash
-# Copy systemd service
-sudo cp dritara.service /etc/systemd/system/
-sudo systemctl enable dritara
-sudo systemctl start dritara
-
-# Check logs
-tail -f logs/monitor.log
-
-# Health check
-curl http://localhost:8088/health
-```
+The repository does not yet ship a production-ready systemd unit or container image. Follow the verified status and target procedure in `docs/operations/deployment.md` before deploying.
 
 ### Running tests
 
@@ -155,7 +149,7 @@ curl http://localhost:8088/health
 make test
 ```
 
-Test suite: 146/146 ✅
+The authoritative check is `make check`; avoid relying on a static test count.
 
 ### Project status
 
@@ -178,7 +172,7 @@ Feed RSS (30+)
       ↓
   Fetcher — raccoglie gli articoli grezzi
       ↓
-  Deduplicatore — rimuove i duplicati per similarità del titolo (ultimi 7 giorni)
+  Deduplicatore — rimuove i duplicati nel batch di fetch corrente
       ↓
   Scorer — assegna uno score di rilevanza usando cluster di keyword:
             Cluster A (Geografia: Sud Italia)
@@ -198,7 +192,7 @@ Feed RSS (30+)
 
 - **Fetch automatico** di 30+ feed RSS italiani (nazionali e locali)
 - **Scorer keyword-based** con cluster geografici e tematici, territorial boost, proximity check, blacklist boilerplate
-- **Deduplicazione** tra feed e storico pubblicazioni (ultimi 7 giorni)
+- **Deduplicazione** tra feed nel batch corrente, con controllo pre-notifica sui titoli pubblicati di recente
 - **Controllo editoriale** via bot Telegram — approva, scarta, rimanda articoli
 - **Fallback automatico** — se la Sezione 1 è vuota, i migliori articoli Sezione 2 con match territoriale vengono promossi automaticamente
 - **Max 1 articolo per feed** nella lista admin giornaliera per evitare concentrazione delle fonti
@@ -246,7 +240,8 @@ cp .env.example .env
 | Variabile                    | Descrizione                            |
 | ---------------------------- | -------------------------------------- |
 | `TELEGRAM_BOT_TOKEN`         | Token del bot da @BotFather            |
-| `TELEGRAM_ADMIN_CHAT_ID`     | ID Telegram dell'admin                 |
+| `TELEGRAM_ADMIN_CHAT_ID`     | ID della chat privata admin            |
+| `TELEGRAM_ADMIN_USER_ID`     | ID utente admin (autorizzazione target) |
 | `TELEGRAM_COMMUNITY_CHAT_ID` | ID del gruppo community                |
 | `TELEGRAM_NEWS_THREAD_ID`    | ID del topic per la pubblicazione      |
 | `GOOGLE_DRIVE_FOLDER_ID`     | ID della cartella Drive per gli export |
@@ -293,18 +288,7 @@ cp .env.example .env
 
 ### Deploy (Raspberry Pi)
 
-```bash
-# Copia il service systemd
-sudo cp dritara.service /etc/systemd/system/
-sudo systemctl enable dritara
-sudo systemctl start dritara
-
-# Controlla i log
-tail -f logs/monitor.log
-
-# Health check
-curl http://localhost:8088/health
-```
+Il repository non include ancora una unit systemd o un'immagine container pronta per la produzione. Prima del deploy seguire stato verificato e procedura target in `docs/operations/deployment.md`.
 
 ### Eseguire i test
 
@@ -312,7 +296,7 @@ curl http://localhost:8088/health
 make test
 ```
 
-Test suite: 146/146 ✅
+Il controllo autoritativo è `make check`; non fare affidamento su un conteggio statico dei test.
 
 ### Stato del progetto
 

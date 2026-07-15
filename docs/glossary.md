@@ -1,0 +1,24 @@
+# Glossario
+
+- **Article**: item RSS persistito dopo scoring; non rappresenta tutto il raw universe.
+- **Candidate/Exposure**: articolo mostrato all'editor in una specifica versione digest.
+- **DigestRun**: esecuzione persistita e riprendibile della pipeline giornaliera target.
+- **Decision**: evento editoriale esplicito e append-only.
+- **Approval**: autorizzazione umana versionata della preview pubblica.
+- **Publication/Delivery**: tentativo di consegna a una destinazione Telegram.
+- **Delivery unknown**: invio potenzialmente accettato dal provider; richiede riconciliazione manuale.
+- **Section1 / Impatto sul Sud**: territorio + valore tematico dimostrabile.
+- **Section2 / Trend da tradurre**: rilevanza tematica nazionale senza claim territoriale.
+- **Section3 / Radar territoriale**: segnale locale non ancora sufficientemente tematico.
+- **Freshness**: età fra pubblicazione dichiarata e momento di valutazione.
+- **Policy version**: versione delle regole deterministiche di selezione/ranking.
+- **Model version**: provider/model/prompt/schema usati dall'assistente AI.
+- **Source of truth**: dato autoritativo; oggi DB runtime, domani proiezioni dalle state machine/eventi.
+- **Macro-task / Stage**: investimento outcome-oriented composto da micro-task e chiuso solo da un gate umano.
+- **Micro-task**: incremento piccolo, verificabile e collegato a un solo macro-task.
+- **Definition of Ready (DoR)**: informazioni minime per iniziare senza inventare requisiti o controlli.
+- **Definition of Done (DoD)**: standard globale di qualità più condizioni specifiche verificabili del task.
+- **Gate review**: riesame evidence-based di prodotto, tecnica, sicurezza/operazioni e processo a fine macro.
+- **GO / RECYCLE / HOLD / STOP**: avanzare, rielaborare, sospendere o interrompere un macro-task.
+- **Evidence**: output verificabile di test, metrica, benchmark, drill o review; non una dichiarazione generica.
+- **Document drift**: divergenza fra runtime verificato e documentazione.
