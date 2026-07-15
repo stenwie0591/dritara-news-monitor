@@ -2,15 +2,15 @@
 
 | Campo | Valore |
 |---|---|
-| Stato | M02 avviato; baseline Alembic in preparazione senza accesso al DB reale |
+| Stato | M02 avviato; baseline Alembic verificata localmente e in review CI |
 | Macro attivo | `M02` — governance dati e migrazioni SQLite (`in_progress`) |
-| Micro attivo | `M02.01` — Alembic baseline e fixture legacy (`in_progress`) |
+| Micro attivo | `M02.01` — Alembic baseline e fixture legacy (`in_review`) |
 | WIP micro | 1 / limite predefinito 2 |
 | Ultimo gate accettato | M01 `GO`, project owner, 2026-07-15 |
 | Ultima verifica | 2026-07-15 |
 | Baseline Git | branch `feature/codex_init`; `4f0a2fb` all'avvio di M02 |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
-| Verifica locale | `make check`: 228 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13; CI run `29418776529` verde su 3.11/3.13 |
+| Verifica locale | `make check`: 237 test verdi; lock installato, audit e `pip check` verdi su Python 3.13; CI M02.01 3.11/3.13 pending |
 | DB analizzato | `data/dritara.db`, snapshot del solo 2026-03-08 |
 | Fonte runtime | SQLite; YAML solo seed, salvo diversa indicazione |
 
@@ -34,6 +34,7 @@
 - M01.05: secret file fail-closed `0600`, log/backup directory `0700`, redazione pre-sink testata, lock runtime/dev hashati e audit CI bloccante; `python-dotenv` aggiornato a 1.2.2 per chiudere PYSEC-2026-2270.
 - GOV.001: riesame teorico post M00/M01, guida di adozione, ADR-004 e starter kit neutro per esportare il Project Brain; nessun effetto su runtime o stato M02.
 - GOV.002: prompt brownfield autosufficiente da copiare in un progetto esistente e affidare a Codex per migrazione documentale, bootstrap M00 e brainstorming al gate.
+- M02.01: Alembic 1.18.5 senza URL predefinito, baseline fresh `0001`, fingerprint semantico legacy sintetico e 9 test fail-closed; startup e DB reale invariati.
 
 ## Decisioni accettate ma non ancora implementate
 
@@ -57,16 +58,16 @@
 
 ## Prossimi passi
 
-1. Completare M02.01 su DB temporanei e fixture legacy sintetica.
-2. Verificare fresh upgrade, fingerprint/stamp/legacy upgrade, mismatch fail-closed e secondo upgrade no-op.
+1. Confermare la matrice CI Python 3.11/3.13 e chiudere M02.01.
+2. Promuovere M02.02 a `ready`: preflight e migration runner con path/lock/spazio/integrità espliciti.
 3. M02.05/M02.07 restano bloccati fino a snapshot recente autorizzato.
 
 ## Micro-task corrente
 
-- ID/owner/rischio: `M02.01` / Codex / high — introduce il sistema che governerà future modifiche schema, pur senza toccare dati reali in questo micro.
+- ID/owner/rischio: `M02.01` / Codex / high — `in_review`; introduce il sistema che governerà future modifiche schema, pur senza toccare dati reali in questo micro.
 - Outcome: Alembic riconosce in modo deterministico DB fresh, legacy sintetico, versionato e schema inatteso; nessuna migrazione parte allo startup.
 - Scope: dipendenze/config Alembic, revisione baseline, fingerprint, fixture sintetica, test e documentazione. Non-scope: DB reale, backfill, tabelle target, backup/restore operativo e integrazione startup.
-- Evidenze attese: fresh upgrade, fingerprint/stamp/legacy upgrade, secondo upgrade no-op e rifiuto senza scritture di schema divergente; `make check` e CI 3.11/3.13.
+- Evidenze: 9 test migration-specific per fresh/metadata parity, fingerprint/stamp/legacy upgrade, secondo upgrade no-op, path esplicito e rifiuto senza scritture di schema divergente/downgrade; `make check` 237 test, audit e `pip check` verdi. CI 3.11/3.13 pending.
 - Rollback: rimozione coordinata di config/revisioni/dipendenze; nessun rollback dati perché soltanto DB temporanei vengono usati.
 
 ## Ultimo micro-task completato

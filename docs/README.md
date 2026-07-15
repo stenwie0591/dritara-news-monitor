@@ -1,6 +1,6 @@
 # Dritara Project Brain
 
-Questa cartella è la fonte canonica per comprendere il progetto. Ultima verifica: 15 luglio 2026, branch `feature/codex_init`; M01 è chiuso e M02.01 è in corso.
+Questa cartella è la fonte canonica per comprendere il progetto. Ultima verifica: 15 luglio 2026, branch `feature/codex_init`; M01 è chiuso e M02.01 è in review.
 
 ## Regola di lettura
 

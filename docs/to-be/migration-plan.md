@@ -8,7 +8,7 @@ Expand → backfill/quarantine → dual-write → cutover → enforce → contra
 
 ## Revisioni previste
 
-1. `0001_legacy_baseline`: fingerprint esatto dello schema legacy; stamp solo dopo verifica.
+1. `0001_legacy_baseline`: implementata in M02.01 per fresh DB; fingerprint semantico esatto della fixture legacy sintetica e stamp solo dopo verifica. La compatibilità con produzione resta da provare in M02.07.
 2. `0002_expand_workflow_telemetry`: tabelle additive `digest_run`, phase attempt, exposure, decision, delivery, attempt, quality issue e conflict.
 3. `0003_backfill_legacy`: JSON legacy normalizzato; duplicati copiati integralmente in quarantena; `publishing` proiettato `delivery_unknown`.
 4. `0004_enforce_invariants`: batch rebuild SQLite per FK/CHECK/UNIQUE dopo preflight verde.
@@ -29,4 +29,4 @@ I duplicati non vengono cancellati silenziosamente. Survivor: precedenza publish
 
 ## Scaffold sicuro prima del DB reale
 
-Alembic, fixture schema legacy sintetica, preflight read-only, migration runner con path esplicito, restore verifier e CI su fresh/legacy DB. Non applicare stamp/backfill/constraint al DB reale senza copia produzione.
+M02.01 ha consegnato Alembic, fixture schema legacy sintetica, baseline fresh, fingerprint read-only e CI su DB temporanei. M02.02 aggiunge preflight e migration runner; M02.03 il restore verifier. Non applicare stamp/backfill/constraint al DB reale senza copia produzione.

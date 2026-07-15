@@ -14,6 +14,9 @@ main.py
  │   └─ drive.py          │
  ├─ healthcheck.py        │
  └─ database.py ── models.py
+
+alembic.ini ── migrations/env.py ── models.py metadata
+                       └─────────── schema_baseline.py (verifica legacy read-only)
 ```
 
 ## Ownership corrente
@@ -25,7 +28,8 @@ main.py
 | `scheduler.py` | cron e intera pipeline | commit/I/O mescolati | job thin + application |
 | `sender_telegram.py` | rendering, API, queue | dominio e adapter uniti | queue policy + adapter |
 | `database.py` | engine, seed, query | engine globale | session factory/repository |
-| `models.py` | schema SQLModel | string states, no migrations | adapter DB + domain DTO |
+| `models.py` | schema SQLModel | string states, runtime ancora `create_all` | adapter DB + domain DTO |
+| `migrations/`, `schema_baseline.py` | baseline Alembic e fingerprint sintetico | nessun runner/preflight runtime | migration service M02.02 |
 | `fetcher.py` | ingest concorrente | config hard-coded | RSS adapter |
 | `url_security.py` | safe fetch policy | peer-IP/egress residui | RSS security adapter |
 | `scorer.py` | policy ranking | config e regole unite | domain policy |

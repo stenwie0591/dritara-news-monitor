@@ -1,7 +1,7 @@
 # Technology stack decision
 
 - Stato: decisione accettata
-- Ultima verifica: 2026-07-14
+- Ultima verifica: 2026-07-15
 - Principio: migliorare architettura e operatività prima di sostituire tecnologie adeguate.
 
 ## Stack confermato
@@ -20,7 +20,7 @@
 
 ## Aggiunte approvate
 
-- Alembic per schema versionato;
+- Alembic 1.18.5 per schema versionato; baseline/fixture M02.01 implementate, runner e preflight ancora TO-BE;
 - domain state machine e application use case;
 - repository/ports espliciti;
 - clock iniettabile e test crash/concorrenza;

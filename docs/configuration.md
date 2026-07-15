@@ -36,3 +36,7 @@ Segreti e valori specifici del deploy arrivano da environment/.env; default non 
 ## Drift legacy
 
 `config/settings.yaml` dichiara valori diversi (backup 23:00, retry 2, log monthly) e non viene caricato. I YAML feed/keyword restano seed iniziale. Non aggiungere nuove chiavi a YAML o env senza aggiornare questa tabella e un test consumer.
+
+## Migrazioni
+
+`alembic.ini` non contiene `sqlalchemy.url`. Ogni invocazione richiede un URL SQLite esplicito con path assoluto, tramite `-x db_url=...` o `Config` programmatica; URL non SQLite, relativi o in-memory sono rifiutati. Questa configurazione non viene letta dallo startup applicativo.

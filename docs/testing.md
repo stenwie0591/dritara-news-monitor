@@ -20,7 +20,7 @@ Ogni micro-task specifica le evidenze proporzionate al rischio; `done` richiede 
 - Security: rendering Telegram M01.03 e rete RSS M01.04 sono coperti da contract/abuse test offline; resta il drill del firewall egress sul target ARM64 in M05.07.
 - Drive: CSV, backup consistente, token refresh e failure mode.
 - Health/lifecycle: startup config errata, readiness e shutdown.
-- Migrazioni: DB vuoto, upgrade e rollback su copia realistica.
+- Migrazioni: M02.01 copre DB fresh, parity con metadata, fixture legacy sintetica, stamp/upgrade/no-op, path esplicito, mismatch e downgrade fail-closed. Restano preflight/runner, backup/restore e dry-run su copia realistica in M02.02–M02.07.
 
 Non usare il solo numero di test come KPI. Aggiungere coverage inizialmente informativa e alzare la soglia per moduli stabilizzati, evitando test che fissano dettagli interni durante il refactoring.
 

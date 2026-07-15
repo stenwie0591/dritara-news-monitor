@@ -30,6 +30,7 @@ aiohttp espone GET /health nello stesso processo asyncio.
 | Ingestion | `src/fetcher.py`, `src/url_security.py` | fetch concorrente bounded, DNS-pinned/peer policy e parsing RSS |
 | Ranking | `src/scorer.py` | matching regex e policy editoriale |
 | Persistenza | `src/database.py`, `src/models.py` | engine SQLite, seed, query ed entità |
+| Migrazioni | `alembic.ini`, `migrations/`, `src/schema_baseline.py` | baseline fresh e fingerprint legacy read-only; non collegati allo startup |
 | Export | `src/drive.py` | OAuth, CSV e backup SQLite |
 | Monitoring | `src/monitor.py`, `src/healthcheck.py` | heartbeat e sola liveness |
 
@@ -49,7 +50,7 @@ usano lock transitivi hashati e un audit vulnerabilità bloccante.
 - SQLite in `data/dritara.db` è la source of truth runtime.
 - `config/feeds.yaml` e `config/keywords.yaml` inizializzano soltanto un DB vuoto.
 - Gli stati principali della coda sono stringhe: `pending`, `approved`, `deferred`, `publishing`, `published`, `discarded`.
-- Non esiste un sistema di migrazioni; `create_all()` non aggiorna schemi esistenti.
+- Alembic ha una baseline versionata e fixture sintetica, ma non esiste ancora un runner operativo; `create_all()` resta nello startup e non aggiorna schemi esistenti.
 - Foreign key SQLite, uniqueness della coda e transizioni di stato non sono enforceate in modo completo.
 
 ## Proprietà operative

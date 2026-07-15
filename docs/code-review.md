@@ -25,7 +25,7 @@ Data audit: 14 luglio 2026. Baseline iniziale: 146 test superati con 60 warning.
 - Backup del DB live non garantisce consistenza. Usare SQLite backup API/snapshot.
 - Il health check è liveness, non readiness.
 - Config/env sono duplicati e letti all'import, con errori poco diagnostici.
-- Nessuna migrazione schema, foreign key esplicite, enum/check constraint o uniqueness per statistiche/coda.
+- Baseline Alembic e fingerprint legacy sintetico sono presenti (M02.01); preflight/runner, versione del DB reale, foreign key runtime, CHECK e backfill/quarantena restano M02.02–M02.07.
 
 ## Medi / P2
 
