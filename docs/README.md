@@ -31,6 +31,9 @@ Non dedurre che una decisione sia già implementata. Verificare sempre [project-
 - [AI handoff](ai-handoff.md) — protocollo operativo per modelli e agenti.
 - [Delivery framework](governance/delivery-framework.md) — lifecycle macro/micro, PDSA e gate umano.
 - [Definition of Done](governance/definition-of-done.md) — qualità globale, risk-based e macro.
+- [Valutazione del framework](governance/framework-assessment.md) — fondamenti teorici, audit dopo M00/M01, limiti e criteri di validazione.
+- [Guida di adozione](governance/adoption-guide.md) — nucleo portabile, profili di rigore e bootstrap di altri progetti.
+- [Starter kit Project Brain](../templates/project-brain/README.md) — struttura neutra copiabile in un nuovo repository.
 - [Template macro](governance/macro-task-template.md), [micro](governance/micro-task-template.md) e [gate review](governance/macro-review-template.md).
 - [Risk register](governance/risk-register.md) e [gate review storiche](reviews/README.md).
 - [ADR index](governance/adr-index.md) e [template ADR](governance/adr-template.md).

@@ -22,3 +22,6 @@
 - **GO / RECYCLE / HOLD / STOP**: avanzare, rielaborare, sospendere o interrompere un macro-task.
 - **Evidence**: output verificabile di test, metrica, benchmark, drill o review; non una dichiarazione generica.
 - **Document drift**: divergenza fra runtime verificato e documentazione.
+- **Evidence-Gated Delivery**: ibrido interno Agile–Stage-Gate che combina piccoli batch, PDSA, DoD risk-based e gate umano basato su evidenze.
+- **Project Brain**: insieme versionato di AS-IS, stato, piano, decisioni, rischi, review e handoff che funge da memoria e sistema operativo del progetto.
+- **GOV.NNN**: task owner-requested di sola manutenzione della governance; non modifica runtime/prodotto/dati e non autorizza un macro.

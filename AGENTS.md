@@ -23,6 +23,7 @@ La Definition of Done canonica è in `docs/governance/definition-of-done.md`. Ol
 ## Regole di delivery
 
 - Lavorare solo su un micro-task `ready` del macro attivo, citandone l'ID; lavoro emergente riceve prima un ID.
+- Quando nessun macro è attivo, la sola manutenzione documentale di governance può usare un task `GOV.NNN` autorizzato dal project owner secondo ADR-004; non modifica runtime/prodotto/dati e non autorizza il macro successivo.
 - Un solo macro-task è `in_progress`; non implementare il successivo senza gate umano `GO`.
 - Gli agenti possono preparare evidenze e review ma non auto-approvare un gate o un contenuto pubblico.
 - Alla chiusura di ogni micro aggiornare evidenze, AS-IS e handoff; alla chiusura macro usare il template di gate e riesaminare prodotto, architettura, performance, sicurezza e operazioni.

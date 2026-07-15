@@ -32,6 +32,7 @@
 - M01.03: renderer HTML Telegram unico, escaping fail-safe, rimozione bidi/control, link HTTP(S) validati e splitting senza tag/entity spezzati.
 - M01.04: client RSS senza proxy/retry/redirect automatici, connect DNS-pinned e peer verificato; streaming 2 MiB/feed, quota 32 MiB/run, timeout chain e field/entry limits.
 - M01.05: secret file fail-closed `0600`, log/backup directory `0700`, redazione pre-sink testata, lock runtime/dev hashati e audit CI bloccante; `python-dotenv` aggiornato a 1.2.2 per chiudere PYSEC-2026-2270.
+- GOV.001: riesame teorico post M00/M01, guida di adozione, ADR-004 e starter kit neutro per esportare il Project Brain; nessun effetto su runtime o stato M02.
 
 ## Decisioni accettate ma non ancora implementate
 
@@ -66,6 +67,13 @@
 - Sicurezza: file sensibili presenti devono essere regolari, non symlink e `0600`; token/log writer applicano `0600`, directory log/backup `0700`; contract test dimostra redazione token prima del sink.
 - Rollout/rollback: nessuna migrazione/flag. File permissivo blocca startup/autorizzazione con istruzione di correggere il mode; rollback coordinato di lock, bootstrap e script.
 - Residuo: SBOM e update automation restano M05.06; egress firewall host M05.07; nessun rischio critico M01.05 accettato in deroga.
+
+## Ultima manutenzione governance
+
+- ID/owner/data: `GOV.001` / Codex su richiesta del project owner / 2026-07-15; stato `done`.
+- Outcome: valutazione metodologica conservata, limiti e criteri di validazione espliciti, guida e starter kit copiabile disponibili.
+- Evidenze: ADR-004, documenti governance, asset `templates/project-brain/`, checker esteso e `make check`.
+- Invarianti: nessuna modifica a runtime, dati, roadmap di delivery o gate M01; M02 resta non avviato.
 
 ## Regola di sicurezza
 

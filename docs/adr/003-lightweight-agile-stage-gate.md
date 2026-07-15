@@ -27,3 +27,7 @@ Maggiore tracciabilità e capacità di handoff; costo di mantenere task/evidenze
 ## Rollout e rollback
 
 M00 introduce framework, template, roadmap e checker. Dopo due gate si valuta la cerimonia tramite lead time, rework e document drift. Modifiche sostanziali richiedono un ADR che sostituisca questo.
+
+## Riesame dopo due gate — 2026-07-15
+
+Il riesame M00/M01 conferma la decisione: tracciabilità, risk-based DoD, human gate e feedback CI hanno prodotto apprendimenti verificabili senza concentrare test e documentazione alla fine del macro. La maturità empirica resta iniziale e le metriche di processo non sono ancora raccolte sistematicamente. Assessment, criteri di validazione e limiti sono conservati in `docs/governance/framework-assessment.md`; portabilità e maintenance lane sono governate da ADR-004.

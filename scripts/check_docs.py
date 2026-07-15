@@ -20,11 +20,33 @@ REQUIRED = [
     "docs/roadmap-to-be.md",
     "docs/governance/delivery-framework.md",
     "docs/governance/definition-of-done.md",
+    "docs/governance/framework-assessment.md",
+    "docs/governance/adoption-guide.md",
     "docs/governance/macro-task-template.md",
     "docs/governance/micro-task-template.md",
     "docs/governance/macro-review-template.md",
     "docs/governance/risk-register.md",
     "docs/reviews/README.md",
+    "docs/adr/004-portable-project-brain.md",
+]
+STARTER_REQUIRED = [
+    "templates/project-brain/README.md",
+    "templates/project-brain/AGENTS.md",
+    "templates/project-brain/docs/README.md",
+    "templates/project-brain/docs/project-state.md",
+    "templates/project-brain/docs/architecture-as-is.md",
+    "templates/project-brain/docs/roadmap-to-be.md",
+    "templates/project-brain/docs/to-be/backlog.md",
+    "templates/project-brain/docs/ai-handoff.md",
+    "templates/project-brain/docs/governance/delivery-framework.md",
+    "templates/project-brain/docs/governance/definition-of-done.md",
+    "templates/project-brain/docs/governance/risk-register.md",
+    "templates/project-brain/docs/governance/macro-task-template.md",
+    "templates/project-brain/docs/governance/micro-task-template.md",
+    "templates/project-brain/docs/governance/macro-review-template.md",
+    "templates/project-brain/docs/governance/adr-template.md",
+    "templates/project-brain/docs/adr/README.md",
+    "templates/project-brain/docs/reviews/README.md",
 ]
 LINK = re.compile(r"\[[^]]+\]\(([^)]+)\)")
 MICRO_ROW = re.compile(r"^\|\s*(M\d{2}\.\d{2})\s*\|[^\n]+\|$", re.MULTILINE)
@@ -36,6 +58,10 @@ def main() -> int:
     for relative in REQUIRED:
         if not (ROOT / relative).is_file():
             errors.append(f"missing required document: {relative}")
+
+    for relative in STARTER_REQUIRED:
+        if not (ROOT / relative).is_file():
+            errors.append(f"missing project-brain starter file: {relative}")
 
     for document in [ROOT / "AGENTS.md", *sorted((ROOT / "docs").rglob("*.md"))]:
         text = document.read_text(encoding="utf-8")
@@ -72,7 +98,10 @@ def main() -> int:
     if errors:
         print("\n".join(errors))
         return 1
-    print(f"Documentation check passed ({len(REQUIRED)} required documents).")
+    print(
+        "Documentation check passed "
+        f"({len(REQUIRED)} required documents, {len(STARTER_REQUIRED)} starter files)."
+    )
     return 0
 
 

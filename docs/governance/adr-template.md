@@ -5,7 +5,7 @@
 - Owner: TBD
 - Implementazione: none
 - Supersedes: none
-- Macro/micro task: MXX / MXX.YY
+- Macro/micro o governance task: MXX / MXX.YY / GOV.NNN
 
 ## Contesto
 

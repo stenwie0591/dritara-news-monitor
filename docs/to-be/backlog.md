@@ -22,6 +22,14 @@ Registro canonico dei micro-task della [roadmap](../roadmap-to-be.md). Stati: `p
 | M01.04 | done | Network policy RSS completa | M01.01 | Ogni DNS/redirect/peer IP è validato; reti private/metadata bloccate; cap, timeout, redirect ed egress target sono testati. |
 | M01.05 | done | Secret e supply-chain hygiene | M01.01 | Mode file/directory verificati, token assenti dai log, dipendenze locked e nessuna vulnerabilità critica resta senza accettazione. |
 
+## Governance maintenance
+
+I task `GOV.NNN` seguono ADR-004: sono owner-requested, documentali e non autorizzano avanzamenti di macro.
+
+| ID | Stato | Outcome/deliverable | Dipendenze | DoD specifica |
+|---|---|---|---|---|
+| GOV.001 | done | Assessment teorico e Project Brain portabile | gate M01, richiesta owner | Assessment, guida, ADR e starter kit neutro presenti; indice/stato/handoff sincronizzati; checker e `make check` verdi. |
+
 ## M02 — Dati e migrazioni SQLite
 
 | ID | Stato | Outcome/deliverable | Dipendenze | DoD specifica |

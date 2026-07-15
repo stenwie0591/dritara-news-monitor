@@ -77,3 +77,11 @@ La Definition of Done completa è in [governance/definition-of-done.md](governan
 - Record: `docs/reviews/M01-2026-07-15.md`, firmato tramite approvazione esplicita in chat.
 - Vincolo immediato: M02 resta `proposed` e nessun micro è attivo finché il project owner non conclude le domande preliminari e richiede l'avvio.
 - All'avvio M02: portare M02 `in_progress` e solo M02.01 `ready`; M02.05/M02.07 restano `blocked`.
+
+## Ultima manutenzione governance — GOV.001
+
+- Stato/owner/data: `GOV.001` `done`, Codex su richiesta del project owner, 2026-07-15.
+- Scope: assessment teorico/operativo del framework, guida d'adozione, profili di rigore, ADR-004 e starter kit portabile.
+- Evidenze: `docs/governance/framework-assessment.md`, `docs/governance/adoption-guide.md`, `templates/project-brain/`; checker documentale esteso e `make check` verde.
+- Invarianti: nessun codice runtime, dato, gate storico o macro di delivery modificato; M02 resta `proposed` e nessun micro M02 è attivo.
+- Uso: copiare lo starter kit in un repository nuovo, sostituire i segnaposto, verificare l'AS-IS e definire roadmap/rischi prima di promuovere il primo task.

@@ -29,6 +29,8 @@ Product Goal
 | `reviews/` | evidenze e decisioni umane immutabili dei gate |
 | `adr/` | decisioni architetturali significative |
 | documenti AS-IS | comportamento realmente presente nel worktree verificato |
+| `framework-assessment.md` | riesame teorico ed empirico del metodo |
+| `adoption-guide.md` | profilo portabile e procedura di bootstrap |
 
 Roadmap, backlog e project state non devono duplicare dettagli. In caso di conflitto, il codice/test definiscono l'AS-IS; `project-state.md` definisce lo stato operativo; il gate firmato autorizza il passaggio.
 
@@ -62,6 +64,10 @@ Un micro-task è `ready` quando parent macro, valore/problema, acceptance criter
 - Cambi ad alto rischio usano test dedicati, feature flag/shadow mode, migrazione expand–migrate–contract e rollback provato.
 - Una scoperta che invalida outcome o sicurezza ferma il task e aggiorna rischio/backlog; non viene nascosta come dettaglio implementativo.
 
+### Manutenzione emergente della governance
+
+Quando nessun macro è attivo, una richiesta esplicita del project owner può ricevere un ID `GOV.NNN` se modifica soltanto metodo, documentazione, template o checker di governance. Il task deve dichiarare outcome, scope, rischio, verifica ed evidenze; non può modificare runtime, prodotto, dati o gate storici, né autorizzare il macro successivo. Qualunque cambiamento sostanziale del metodo richiede un ADR.
+
 ## Gate di fine macro-task
 
 Prima del macro successivo si compila [il template di review](macro-review-template.md) in `docs/reviews/`. La review distingue:
@@ -88,3 +94,5 @@ Tracciare senza trasformarle in target individuali: lead time micro, CI pass rat
 ## Modifica del framework
 
 Le regole possono evolvere tramite ADR. Ridurre un controllo richiede evidenza che sia ridondante; aggiungerne uno richiede un rischio o failure mode concreto. La governance deve ridurre incertezza, non produrre cerimonia.
+
+Il [riesame dopo M00/M01](framework-assessment.md) valuta solidità, limiti e maturità empirica. La [guida di adozione](adoption-guide.md) e lo [starter kit](../../templates/project-brain/README.md) separano i principi portabili dai contenuti specifici di Dritara.

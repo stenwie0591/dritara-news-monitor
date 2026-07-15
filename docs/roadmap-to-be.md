@@ -4,6 +4,8 @@
 
 La roadmap segue il [Dritara Evidence-Gated Delivery Framework](governance/delivery-framework.md). I macro-task sono sequenziali per rischio e dipendenza; i micro-task sono piccoli e continuamente integrabili. Il macro successivo non entra in `in_progress` senza gate umano `GO`, review degli apprendimenti e documentazione aggiornata.
 
+La manutenzione documentale `GOV.NNN` definita da ADR-004 non appartiene alla sequenza degli outcome e non può essere usata per anticipare o autorizzare un macro.
+
 Stato corrente: **M01 `closed`** con gate umano `GO` del 2026-07-15. M02 resta `proposed` in attesa del confronto preliminare richiesto dal project owner. Registro eseguibile: [backlog](to-be/backlog.md).
 
 ## Sequenza
