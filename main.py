@@ -8,6 +8,7 @@ Avvia in parallelo:
 
 import asyncio
 import sys
+from pathlib import Path
 
 from loguru import logger
 
@@ -16,6 +17,7 @@ from src.config import RuntimeSettings, get_settings, redact_runtime_secrets
 from src.database import init_db
 from src.healthcheck import run_healthcheck
 from src.scheduler import build_scheduler
+from src.secret_hygiene import validate_runtime_secret_modes
 
 LOG_FORMAT = (
     "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | "
@@ -23,8 +25,14 @@ LOG_FORMAT = (
 )
 
 
-def configure_logging(settings: RuntimeSettings) -> None:
+def configure_logging(
+    settings: RuntimeSettings, *, log_path: Path = Path("logs/monitor.log")
+) -> None:
     """Configura i sink solo all'avvio, dopo la validazione dei settings."""
+    log_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    log_path.parent.chmod(0o700)
+    log_path.touch(exist_ok=True, mode=0o600)
+    log_path.chmod(0o600)
     logger.remove()
     logger.configure(
         patcher=lambda record: record.update(
@@ -33,7 +41,7 @@ def configure_logging(settings: RuntimeSettings) -> None:
     )
     logger.add(sys.stderr, level=settings.log_level.upper(), format=LOG_FORMAT)
     logger.add(
-        "logs/monitor.log",
+        log_path,
         level=settings.log_level.upper(),
         rotation="10 MB",
         retention="30 days",
@@ -43,6 +51,7 @@ def configure_logging(settings: RuntimeSettings) -> None:
 
 
 async def main() -> None:
+    validate_runtime_secret_modes()
     settings = get_settings().validated_for_runtime()
     configure_logging(settings)
     logger.info("=== Dritara News Monitor avviato ===")

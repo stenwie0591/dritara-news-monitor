@@ -23,7 +23,7 @@ aiohttp espone GET /health nello stesso processo asyncio.
 
 | Area | File | Responsabilità attuale |
 |---|---|---|
-| Entrypoint | `main.py` | logging, lifecycle, avvio servizi |
+| Entrypoint | `main.py`, `src/secret_hygiene.py` | validazione mode segreti, logging redatto, lifecycle, avvio servizi |
 | Orchestrazione | `src/scheduler.py` | pipeline giornaliera, recovery, cleanup, backup, cron |
 | Admin | `src/bot.py` | polling, parsing comandi, query e mutazioni DB, analisi keyword |
 | Delivery | `src/sender_telegram.py`, `src/telegram_renderer.py` | singolo adapter API Telegram, rendering HTML sicuro, coda e dedup pubblicati |
@@ -36,6 +36,13 @@ aiohttp espone GET /health nello stesso processo asyncio.
 Ogni invio Telegram attraversa `sender_telegram._send`. Il renderer tratta le stringhe legacy come testo non attendibile e consente HTML ricco solo tramite primitive che escapano i campi, rimuovono control/bidi, validano link HTTP(S) senza credenziali e non spezzano tag/entity durante lo split. `monitor.py` non possiede più un client Telegram duplicato.
 
 `src/backup.py` e `src/sender.py` sono placeholder. `DigestFormatter` e `DigestLog` non sono integrati nel flusso principale. `config/settings.yaml` non è consumato dal codice.
+
+Il bootstrap valida senza leggere il contenuto che i file sensibili locali presenti
+siano file regolari non-symlink con mode `0600`. Il token OAuth viene verificato
+prima della lettura e scritto con descriptor `0600`; directory/file di log sono
+`0700`/`0600` e il patcher Loguru redige il token Telegram prima di ogni sink.
+Le dipendenze dirette restano negli input `requirements*.txt`; installazione e CI
+usano lock transitivi hashati e un audit vulnerabilità bloccante.
 
 ## Dati e source of truth
 

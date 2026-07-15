@@ -6,12 +6,25 @@
 python3.11 -m venv .venv
 make setup-dev
 cp .env.example .env
-chmod 600 .env credentials_oauth.json token_drive.json
-make test
+chmod 600 .env
+chmod 600 credentials_oauth.json token_drive.json  # solo se presenti
+make check
 .venv/bin/python main.py
 ```
 
-Non committare segreti, `data/` o `logs/`. Lo startup crea schema e seed se il DB è vuoto.
+`requirements.txt` e `requirements-dev.txt` sono gli input dichiarativi; i file
+`*.lock` transitivi con hash sono quelli installati. Dopo una modifica intenzionale
+agli input eseguire `make lock`, riesaminare il diff e poi `make audit`. La CI blocca
+hash incompleti, dipendenze rotte e vulnerabilità note del runtime.
+
+Non committare segreti, `data/` o `logs/`. Lo startup rifiuta `.env`, credenziali
+OAuth e token Drive presenti con mode diverso da `0600`; la directory dei log è
+creata `0700` e il file `0600`. Lo startup crea schema e seed se il DB è vuoto.
+
+Per autorizzare Drive, prima applicare `chmod 600 credentials_oauth.json`, quindi
+eseguire `.venv/bin/python -m scripts.authorize_drive`. Lo script genera o aggiorna
+`token_drive.json` a `0600`. `scripts/backup_env.sh` forza directory backup `0700`
+e copie `0600` senza elencarne il contenuto.
 
 ## Controlli quotidiani
 

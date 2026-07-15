@@ -80,11 +80,12 @@ cd dritara-news-monitor
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the hash-verified development environment
+make setup-dev
 
 # Configure environment
 cp .env.example .env
+chmod 600 .env
 # Edit .env with your Telegram credentials and Google Drive folder ID
 ```
 
@@ -227,11 +228,12 @@ cd dritara-news-monitor
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Installa le dipendenze
-pip install -r requirements.txt
+# Installa l'ambiente di sviluppo verificando tutti gli hash
+make setup-dev
 
 # Configura l'ambiente
 cp .env.example .env
+chmod 600 .env
 # Modifica .env con le tue credenziali Telegram e il Google Drive folder ID
 ```
 

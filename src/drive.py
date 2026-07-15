@@ -18,6 +18,7 @@ from googleapiclient.http import MediaIoBaseUpload
 from loguru import logger
 
 from src.config import RuntimeSettings, get_settings
+from src.secret_hygiene import read_private_text, write_private_text
 
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 TOKEN_PATH = Path("token_drive.json")
@@ -31,14 +32,7 @@ def _safe_csv_cell(value) -> str:
 
 def _get_drive_service():
     """Restituisce un client Drive autenticato, rinnovando il token se necessario."""
-    if not TOKEN_PATH.exists():
-        raise FileNotFoundError(
-            f"Token OAuth non trovato: {TOKEN_PATH}. "
-            "Esegui scripts/authorize_drive.py sul Mac."
-        )
-
-    with open(TOKEN_PATH) as f:
-        token_data = json.load(f)
+    token_data = json.loads(read_private_text(TOKEN_PATH))
 
     creds = Credentials(
         token=token_data["token"],
@@ -55,9 +49,7 @@ def _get_drive_service():
             creds.refresh(Request())
             # Salva il token aggiornato
             token_data["token"] = creds.token
-            with open(TOKEN_PATH, "w") as f:
-                json.dump(token_data, f, indent=2)
-            TOKEN_PATH.chmod(0o600)
+            write_private_text(TOKEN_PATH, json.dumps(token_data, indent=2))
             logger.info("Token Drive rinnovato")
         else:
             raise RuntimeError(

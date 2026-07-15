@@ -4,13 +4,13 @@
 |---|---|
 | Stato | M01 fondazione sicura/configurazione in corso |
 | Macro attivo | `M01` — sicurezza e configurazione (`in_progress`) |
-| Micro attivo | nessuno; `M01.05` deve ancora superare la Definition of Ready |
+| Micro attivo | nessuno; M01 in preparazione review/gate |
 | WIP micro | 0 / limite predefinito 2 |
 | Ultimo gate accettato | M00 `GO`, project owner, 2026-07-15 |
 | Ultima verifica | 2026-07-15 |
-| Baseline Git | `4eeac33`; worktree con modifiche non consolidate |
+| Baseline Git | branch `feature/codex_init`; M01.05 pronto al commit |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
-| Verifica locale | `make check`: 220 test verdi, docs check e compileall verdi |
+| Verifica locale | `make check`: 227 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13 |
 | DB analizzato | `data/dritara.db`, snapshot del solo 2026-03-08 |
 | Fonte runtime | SQLite; YAML solo seed, salvo diversa indicazione |
 
@@ -31,6 +31,7 @@
 - M01.02: principal Telegram verificato tramite user ID, chat configurata e chat privata, uniforme per messaggi/callback.
 - M01.03: renderer HTML Telegram unico, escaping fail-safe, rimozione bidi/control, link HTTP(S) validati e splitting senza tag/entity spezzati.
 - M01.04: client RSS senza proxy/retry/redirect automatici, connect DNS-pinned e peer verificato; streaming 2 MiB/feed, quota 32 MiB/run, timeout chain e field/entry limits.
+- M01.05: secret file fail-closed `0600`, log/backup directory `0700`, redazione pre-sink testata, lock runtime/dev hashati e audit CI bloccante; `python-dotenv` aggiornato a 1.2.2 per chiudere PYSEC-2026-2270.
 
 ## Decisioni accettate ma non ancora implementate
 
@@ -54,8 +55,16 @@
 
 ## Prossimi micro-task nel macro M01
 
-1. Raffinare `M01.05` fino alla Definition of Ready: dependency lock/audit e secret hygiene finale.
-2. Preparare review multidisciplinare M01 e gate umano solo dopo M01.05.
+1. Preparare review multidisciplinare M01 con evidenze consolidate.
+2. Richiedere il gate umano M01; non avviare M02 senza `GO`.
+
+## Ultimo micro-task completato
+
+- ID/owner/data: `M01.05` / Codex / 2026-07-15; stato `done`.
+- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 227 test, docs e compile verdi su Python 3.13. La matrice CI 3.11/3.13 è l'evidenza remota post-push.
+- Sicurezza: file sensibili presenti devono essere regolari, non symlink e `0600`; token/log writer applicano `0600`, directory log/backup `0700`; contract test dimostra redazione token prima del sink.
+- Rollout/rollback: nessuna migrazione/flag. File permissivo blocca startup/autorizzazione con istruzione di correggere il mode; rollback coordinato di lock, bootstrap e script.
+- Residuo: SBOM e update automation restano M05.06; egress firewall host M05.07; nessun rischio critico M01.05 accettato in deroga.
 
 ## Regola di sicurezza
 

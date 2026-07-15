@@ -20,7 +20,7 @@ Registro canonico dei micro-task della [roadmap](../roadmap-to-be.md). Stati: `p
 | M01.02 | done | Autorizzazione Telegram uniforme | M01.01 | Comandi/callback accettano solo `from.id` autorizzato in chat privata; impersonation e chat non privata sono testate e negate. |
 | M01.03 | done | Rendering Telegram sicuro | M01.01 | Un solo renderer effettua escaping di RSS/admin/AI, bidi/control e limiti; contract test dimostrano messaggi/link non alterabili. |
 | M01.04 | done | Network policy RSS completa | M01.01 | Ogni DNS/redirect/peer IP è validato; reti private/metadata bloccate; cap, timeout, redirect ed egress target sono testati. |
-| M01.05 | proposed | Secret e supply-chain hygiene | M01.01 | Mode file/directory verificati, token assenti dai log, dipendenze locked e nessuna vulnerabilità critica resta senza accettazione. |
+| M01.05 | done | Secret e supply-chain hygiene | M01.01 | Mode file/directory verificati, token assenti dai log, dipendenze locked e nessuna vulnerabilità critica resta senza accettazione. |
 
 ## M02 — Dati e migrazioni SQLite
 

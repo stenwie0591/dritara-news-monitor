@@ -10,7 +10,7 @@ sqlmodel==0.0.16
 # Config
 pydantic-settings==2.2.1
 pyyaml==6.0.1
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 
 # Keyword matching
 rapidfuzz==3.6.1

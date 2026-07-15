@@ -60,3 +60,12 @@ La Definition of Done completa è in [governance/definition-of-done.md](governan
 - Invarianti/failure: nessun retry; scoring, ordine editoriale, DB e scheduler invariati. Violazione policy fallisce il solo feed e viene registrata dall'attuale error path.
 - Rollout/rollback: nessuna migrazione/flag. Rollback coordinato di factory/backend/fetch policy; non rimuovere i cap preesistenti. L'egress firewall host resta defense-in-depth del deploy M05.07, con target documentato.
 - Rischio residuo: integrazione HTTPX/httpcore volutamente pin-dependent; `httpcore==1.0.9` è ora dipendenza diretta e M01.05 deve verificarne lock/audit e policy aggiornamenti.
+
+## Ultimo handoff — M01.05
+
+- Stato/owner/data: `M01.05` `done`, Codex, 2026-07-15. M01 non è auto-approvato: il prossimo lavoro consentito è la review macro e il gate umano.
+- Scope effettivo: input dependency dichiarativi e lock runtime/dev transitivi hashati; installazione CI `--require-hashes`; audit e `pip check` bloccanti; controllo fail-closed `0600` su secret file non-symlink; writer sicuri per OAuth/log e backup `0700`/`0600`; redazione token prima dei sink.
+- File principali: `requirements*.txt`, `requirements*.lock`, `Makefile`, CI, `src/secret_hygiene.py`, `main.py`, `src/drive.py`, script OAuth/backup e `tests/test_secret_hygiene.py`.
+- Evidenze: clean install del lock dev riuscita in venv temporanea Python 3.13; `pip-audit` runtime senza vulnerabilità note; `pip check` verde; `make check` e clean-env suite verdi con 227 test. `python-dotenv` è passato da 1.0.1 a 1.2.2 per chiudere PYSEC-2026-2270. Matrice remota 3.11/3.13 da confermare post-push.
+- Invarianti/failure: nessuna modifica a DB, stati, workflow, scoring o semantica editoriale. Un mode permissivo o symlink blocca prima della lettura; nessun segreto reale è stato letto nei test.
+- Rollback/residui: nessuna migrazione/flag; rollback coordinato di bootstrap, script e lock. SBOM/update automation restano M05.06, firewall host M05.07. Prima di M02 servono review M01 e `GO` umano.

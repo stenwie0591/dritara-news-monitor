@@ -16,7 +16,7 @@ Data audit: 14 luglio 2026. Baseline iniziale: 146 test superati con 60 warning.
 
 ## Alti / P1
 
-- Segreti locali erano mode `0644`: corretti a `0600` nel workspace; script di creazione/backup ora applicano permessi restrittivi. I token vanno ruotati se la macchina è multi-user o i file sono stati copiati.
+- Segreti locali erano mode `0644`: il bootstrap ora rifiuta file non `0600` e symlink; OAuth/backup/log applicano mode restrittivi e la redazione pre-sink è coperta da contract test (M01.05). I token vanno ruotati se la macchina è multi-user o i file sono stati copiati.
 - RSS resource exhaustion: corretto con streaming 2 MiB/feed, quota 32 MiB/run, 200 entry, field limits e timeout dell'intera redirect chain (M01.04).
 - Input RSS/utente in Telegram: corretto con renderer HTML centralizzato, escaping di testo/attributi, filtro control/bidi, link HTTP(S) senza credenziali e contract/abuse test (M01.03).
 - Lo stato `publishing` fallito resta bloccato fino al restart; dopo il restart lo slot può essere già passato.
@@ -31,7 +31,7 @@ Data audit: 14 luglio 2026. Baseline iniziale: 146 test superati con 60 warning.
 
 - CSV formula injection: mitigata per i campi testuali con prefisso sicuro; mantenere test dedicati.
 - Autorizzazione bot: corretta con principal `user_id + chat_id + private chat`, inclusi negative test e callback policy.
-- Errori httpx possono includere nel log l'URL Telegram con token. Centralizzare il client e redigere i segreti.
+- Gli errori provider attraversano il patcher Loguru con redazione pre-sink; un contract test dimostra che il token completo non raggiunge il file di log (M01.05). La centralizzazione strutturale del client resta M05.
 - Scoring è calcolato due volte per articolo; dedup fuzzy è O(n²); il controllo storico usa query N+1.
 - `config/settings.yaml` è in drift rispetto alle costanti hard-coded.
 - Retention Drive non definita: backup e CSV possono sopravvivere al cleanup locale di 90 giorni.
@@ -40,8 +40,8 @@ Data audit: 14 luglio 2026. Baseline iniziale: 146 test superati con 60 warning.
 
 ## Qualità e manutenzione
 
-- Nessuna CI, packaging moderno, lint/type/coverage/security gate nella baseline.
-- Dev dependencies mancanti dal checkout pulito.
+- La CI ora installa lock transitivi con hash ed esegue audit vulnerabilità e `pip check`; packaging moderno, lint/type/coverage e SBOM restano pianificati.
+- Dev dependencies e tool di lock/audit sono dichiarati, bloccati e provati con clean install.
 - `bot.py` (~1050 LOC), `scheduler.py` (~480) e `sender_telegram.py` (~440) sono god-module.
 - Nessun test diretto per scheduler, Drive, health e lifecycle; test prevalentemente mocked.
 - Uso di `datetime.utcnow()` genera warning su Python 3.13; la migrazione a UTC aware richiede una decisione coerente su DB e confronti.

@@ -8,5 +8,6 @@
 | R-004 | documentazione diverge dal runtime | M/M | DoD, docs check e gate review | maintainer | M00 | open |
 | R-005 | refactoring big-bang interrompe servizio | M/H | characterization, seam, shim, feature flag | tech | M05 | open |
 | R-006 | ranking/AI riduce pluralità territoriale | M/H | baseline, coverage audit, shadow mode, human approval | product | M06/M07 | open |
+| R-007 | dipendenza compromessa o vulnerabile entra nel runtime | L/H | lock transitivi con hash, install/audit CI bloccanti; SBOM e update policy in M05.06 | security/maintainer | M01.05/M05.06 | mitigated/base-controls |
 
 Probabilità/impatto (`P/I`): low, medium, high. Ogni rischio emerso riceve owner, task o accettazione esplicita; la review di macro aggiorna questo registro.

@@ -24,10 +24,10 @@ operator/AI agent → filesystem/repo/DB
 | CSV formula | mitigata | sanitizer testato |
 | admin impersonation | mitigata | user ID + chat ID + chat privata; policy comune messaggi/callback e negative test |
 | duplicate publish | aperta critica | barrier parziale; target unknown reconciliation |
-| secret disclosure/log | parziale | 0600/SecretStr; centralizzare redaction/client |
+| secret disclosure/log | mitigata | bootstrap fail-closed su file non `0600`/symlink, writer OAuth `0600`, log `0700`/`0600`, SecretStr e redazione pre-sink testata |
 | DB corruption/schema drift | aperta | backup+Alembic+FK/WAL/preflight |
 | malicious AI/RSS prompt | target | dati delimitati, structured output, no tools |
-| supply chain | aperta | lock/hash, audit, SBOM, update policy |
+| supply chain | mitigata base | lock runtime/dev transitivi con hash, clean install e audit CI bloccante; SBOM/update automation restano M05.06 |
 | backup over-retention | aperta | lifecycle, ACL audit, restore, encryption decision |
 
 ## Data classification
