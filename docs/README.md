@@ -1,6 +1,6 @@
 # Dritara Project Brain
 
-Questa cartella è la fonte canonica per comprendere il progetto. Ultima verifica: 15 luglio 2026, contro il worktree corrente non ancora consolidato in commit.
+Questa cartella è la fonte canonica per comprendere il progetto. Ultima verifica: 15 luglio 2026, branch `feature/codex_init`; M01 è in `gate_pending`.
 
 ## Regola di lettura
 

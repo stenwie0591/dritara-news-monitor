@@ -4,7 +4,7 @@
 
 La roadmap segue il [Dritara Evidence-Gated Delivery Framework](governance/delivery-framework.md). I macro-task sono sequenziali per rischio e dipendenza; i micro-task sono piccoli e continuamente integrabili. Il macro successivo non entra in `in_progress` senza gate umano `GO`, review degli apprendimenti e documentazione aggiornata.
 
-Stato corrente: **M01 `in_progress`**. M00 è stato chiuso con gate umano `GO` il 2026-07-15. Registro eseguibile: [backlog](to-be/backlog.md).
+Stato corrente: **M01 `gate_pending`**. La review tecnica raccomanda `GO`, ma la decisione resta umana. M00 è stato chiuso con gate umano `GO` il 2026-07-15. Registro eseguibile: [backlog](to-be/backlog.md).
 
 ## Sequenza
 
@@ -31,7 +31,7 @@ M00 governance
 
 ## M01 — Fondazione sicura e configurazione deterministica
 
-- Stato: `in_progress`; M00 chiuso con `GO`.
+- Stato: `gate_pending`; [review M01](reviews/M01-2026-07-15.md) preparata, decisione umana `PENDING`.
 - Outcome: startup prevedibile e trust boundary esterni protetti.
 - Evidenze: clean-room startup/import, negative security test, audit dipendenze e threat-model delta.
 - Micro-task: M01.01–M01.05.

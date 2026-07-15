@@ -2,15 +2,15 @@
 
 | Campo | Valore |
 |---|---|
-| Stato | M01 fondazione sicura/configurazione in corso |
-| Macro attivo | `M01` — sicurezza e configurazione (`in_progress`) |
-| Micro attivo | nessuno; M01 in preparazione review/gate |
+| Stato | M01 review completata, decisione umana richiesta |
+| Macro attivo | `M01` — sicurezza e configurazione (`gate_pending`) |
+| Micro attivo | nessuno; gate M01 `PENDING` |
 | WIP micro | 0 / limite predefinito 2 |
 | Ultimo gate accettato | M00 `GO`, project owner, 2026-07-15 |
 | Ultima verifica | 2026-07-15 |
-| Baseline Git | branch `feature/codex_init`; `2a2181d` con M01.05 verificato in CI |
+| Baseline Git | branch `feature/codex_init`; `72b0888` prima del pacchetto gate M01 |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
-| Verifica locale | `make check`: 228 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13; CI run `29418456705` verde su 3.11/3.13 |
+| Verifica locale | `make check`: 228 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13; CI run `29418776529` verde su 3.11/3.13 |
 | DB analizzato | `data/dritara.db`, snapshot del solo 2026-03-08 |
 | Fonte runtime | SQLite; YAML solo seed, salvo diversa indicazione |
 
@@ -53,10 +53,11 @@
 - placeholder Docker rimossi; deploy systemd/container non ancora riproducibile;
 - i messaggi legacy del bot sono ora sicuri ma inviati come testo escapato; la formattazione ricca va costruita esplicitamente con il renderer.
 
-## Prossimi micro-task nel macro M01
+## Prossimi passi
 
-1. Preparare review multidisciplinare M01 con evidenze consolidate.
-2. Richiedere il gate umano M01; non avviare M02 senza `GO`.
+1. Il project owner decide `GO/RECYCLE/HOLD/STOP` sulla [review M01](reviews/M01-2026-07-15.md).
+2. Solo con `GO`: chiudere M01, avviare M02 e promuovere M02.01 a `ready`.
+3. M02.05/M02.07 restano bloccati fino a snapshot recente autorizzato.
 
 ## Ultimo micro-task completato
 

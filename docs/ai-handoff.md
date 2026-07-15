@@ -69,3 +69,11 @@ La Definition of Done completa è in [governance/definition-of-done.md](governan
 - Evidenze: clean install del lock dev riuscita in venv temporanea Python 3.13; `pip-audit` runtime senza vulnerabilità note; `pip check` verde; `make check` e clean-env suite verdi con 228 test. `python-dotenv` è passato da 1.0.1 a 1.2.2 per chiudere PYSEC-2026-2270. La CI ha rilevato `greenlet` condizionale Linux, ora pin diretto, e test scorer accidentalmente dipendenti dalla directory DB locale, ora isolati in-memory; run `29418456705` verde su 3.11/3.13.
 - Invarianti/failure: nessuna modifica a DB, stati, workflow, scoring o semantica editoriale. Un mode permissivo o symlink blocca prima della lettura; nessun segreto reale è stato letto nei test.
 - Rollback/residui: nessuna migrazione/flag; rollback coordinato di bootstrap, script e lock. SBOM/update automation restano M05.06, firewall host M05.07. Prima di M02 servono review M01 e `GO` umano.
+
+## Gate corrente — M01
+
+- Stato/data: review multidisciplinare preparata il 2026-07-15; M01 `gate_pending`, decisione `PENDING`, raccomandazione tecnica `GO`.
+- Evidenze: 5/5 micro `done`, `make check` con 228 test, lock/audit/pip check verdi e CI run 29418776529 verde su Python 3.11/3.13.
+- Record: `docs/reviews/M01-2026-07-15.md`; nessun agente può sostituire nome, data ed esito dell'approvatore umano.
+- Se `GO`: aggiornare record a `GO`, chiudere M01, portare M02 `in_progress` e M02.01 `ready`; M02.05/M02.07 restano `blocked`.
+- Se non `GO`: registrare motivazione e azioni `RECYCLE/HOLD/STOP`; non implementare M02.
