@@ -61,7 +61,7 @@
 ## Ultimo micro-task completato
 
 - ID/owner/data: `M01.05` / Codex / 2026-07-15; stato `done`.
-- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 227 test, docs e compile verdi su Python 3.13. La matrice CI 3.11/3.13 è l'evidenza remota post-push.
+- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 227 test, docs e compile verdi su Python 3.13. Il primo run remoto ha rilevato la dipendenza condizionale Linux `greenlet`, aggiunta esplicitamente; la matrice corretta 3.11/3.13 resta l'evidenza conclusiva.
 - Sicurezza: file sensibili presenti devono essere regolari, non symlink e `0600`; token/log writer applicano `0600`, directory log/backup `0700`; contract test dimostra redazione token prima del sink.
 - Rollout/rollback: nessuna migrazione/flag. File permissivo blocca startup/autorizzazione con istruzione di correggere il mode; rollback coordinato di lock, bootstrap e script.
 - Residuo: SBOM e update automation restano M05.06; egress firewall host M05.07; nessun rischio critico M01.05 accettato in deroga.

@@ -6,6 +6,8 @@ httpcore==1.0.9
 
 # Database
 sqlmodel==0.0.16
+# SQLAlchemy lo richiede su Linux x86_64/aarch64 ma non su macOS ARM.
+greenlet==3.5.3
 
 # Config
 pydantic-settings==2.2.1
