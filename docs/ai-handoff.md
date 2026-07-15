@@ -93,3 +93,11 @@ La Definition of Done completa è in [governance/definition-of-done.md](governan
 - Evidenze: `templates/PROJECT_BRAIN_BOOTSTRAP_PROMPT.md`; link in indice, adoption guide e starter kit; checker e `make check` verdi.
 - Invarianti: nessuna modifica runtime o dati; M01 resta chiuso e M02 non avviato.
 - Invocazione: copiare il file nella root del progetto target e chiedere all'agente di leggerlo integralmente ed eseguirlo, fermandosi ai gate umani.
+
+## Claim corrente — M02.01
+
+- Stato/owner/data: `M02.01` `in_progress`, Codex, 2026-07-15; M02 avviato dal project owner dopo il gate M01.
+- Outcome: baseline Alembic deterministica su DB fresh/legacy sintetico/versionato, con schema inatteso rifiutato senza scritture e nessuna migrazione allo startup.
+- Scope/file previsti: dipendenze e lock, config/revisioni Alembic, modulo fingerprint/baseline, fixture/test sintetici e documentazione dati/testing; nessun DB reale o backup viene letto.
+- Rischio/evidenze: high per la futura autorità sullo schema; fresh upgrade, legacy fingerprint/stamp/upgrade, secondo upgrade no-op, mismatch fail-closed, suite completa e CI 3.11/3.13.
+- Rollback: rimuovere in modo coordinato scaffold, revisione e dipendenze; M02.01 non applica cambi a dati reali.

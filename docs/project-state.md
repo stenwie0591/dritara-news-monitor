@@ -2,13 +2,13 @@
 
 | Campo | Valore |
 |---|---|
-| Stato | M01 chiuso; confronto preliminare richiesto prima di M02 |
-| Macro attivo | nessuno; M02 autorizzato ma non avviato |
-| Micro attivo | nessuno |
-| WIP micro | 0 / limite predefinito 2 |
+| Stato | M02 avviato; baseline Alembic in preparazione senza accesso al DB reale |
+| Macro attivo | `M02` — governance dati e migrazioni SQLite (`in_progress`) |
+| Micro attivo | `M02.01` — Alembic baseline e fixture legacy (`in_progress`) |
+| WIP micro | 1 / limite predefinito 2 |
 | Ultimo gate accettato | M01 `GO`, project owner, 2026-07-15 |
 | Ultima verifica | 2026-07-15 |
-| Baseline Git | branch `feature/codex_init`; `72b0888` prima del pacchetto gate M01 |
+| Baseline Git | branch `feature/codex_init`; `4f0a2fb` all'avvio di M02 |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
 | Verifica locale | `make check`: 228 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13; CI run `29418776529` verde su 3.11/3.13 |
 | DB analizzato | `data/dritara.db`, snapshot del solo 2026-03-08 |
@@ -57,9 +57,17 @@
 
 ## Prossimi passi
 
-1. Rispondere alle domande preliminari del project owner senza avviare M02.
-2. Su successiva istruzione esplicita: portare M02 `in_progress` e M02.01 `ready`.
+1. Completare M02.01 su DB temporanei e fixture legacy sintetica.
+2. Verificare fresh upgrade, fingerprint/stamp/legacy upgrade, mismatch fail-closed e secondo upgrade no-op.
 3. M02.05/M02.07 restano bloccati fino a snapshot recente autorizzato.
+
+## Micro-task corrente
+
+- ID/owner/rischio: `M02.01` / Codex / high — introduce il sistema che governerà future modifiche schema, pur senza toccare dati reali in questo micro.
+- Outcome: Alembic riconosce in modo deterministico DB fresh, legacy sintetico, versionato e schema inatteso; nessuna migrazione parte allo startup.
+- Scope: dipendenze/config Alembic, revisione baseline, fingerprint, fixture sintetica, test e documentazione. Non-scope: DB reale, backfill, tabelle target, backup/restore operativo e integrazione startup.
+- Evidenze attese: fresh upgrade, fingerprint/stamp/legacy upgrade, secondo upgrade no-op e rifiuto senza scritture di schema divergente; `make check` e CI 3.11/3.13.
+- Rollback: rimozione coordinata di config/revisioni/dipendenze; nessun rollback dati perché soltanto DB temporanei vengono usati.
 
 ## Ultimo micro-task completato
 
@@ -82,4 +90,4 @@ Non eseguire migrazioni sul DB reale senza snapshot consistente, checksum, dry-r
 
 ## Regola di avanzamento
 
-M01 è chiuso con gate umano `GO`. M02 è autorizzabile, ma resta `proposed` finché il project owner non conclude il confronto preliminare e ne richiede l'avvio.
+M01 è chiuso con gate umano `GO`; il project owner ha avviato M02 il 2026-07-15. Solo M02.01 è `in_progress`; nessun altro micro M02 può iniziare finché non è concluso o esplicitamente coordinato entro il WIP.
