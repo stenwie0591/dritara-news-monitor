@@ -8,9 +8,9 @@
 | WIP micro | 0 / limite predefinito 2 |
 | Ultimo gate accettato | M00 `GO`, project owner, 2026-07-15 |
 | Ultima verifica | 2026-07-15 |
-| Baseline Git | branch `feature/codex_init`; M01.05 pronto al commit |
+| Baseline Git | branch `feature/codex_init`; `2a2181d` con M01.05 verificato in CI |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
-| Verifica locale | `make check`: 228 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13 |
+| Verifica locale | `make check`: 228 test verdi; clean hash install, audit e `pip check` verdi su Python 3.13; CI run `29418456705` verde su 3.11/3.13 |
 | DB analizzato | `data/dritara.db`, snapshot del solo 2026-03-08 |
 | Fonte runtime | SQLite; YAML solo seed, salvo diversa indicazione |
 
@@ -61,7 +61,7 @@
 ## Ultimo micro-task completato
 
 - ID/owner/data: `M01.05` / Codex / 2026-07-15; stato `done`.
-- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 228 test, docs e compile verdi su Python 3.13. La CI ha rilevato `greenlet` condizionale Linux, aggiunta esplicitamente, e test scorer dipendenti dalla directory DB locale, ora in-memory; la matrice corretta 3.11/3.13 resta l'evidenza conclusiva.
+- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 228 test, docs e compile verdi su Python 3.13. La CI ha rilevato `greenlet` condizionale Linux, aggiunta esplicitamente, e test scorer dipendenti dalla directory DB locale, ora in-memory; run `29418456705` verde su Python 3.11/3.13.
 - Sicurezza: file sensibili presenti devono essere regolari, non symlink e `0600`; token/log writer applicano `0600`, directory log/backup `0700`; contract test dimostra redazione token prima del sink.
 - Rollout/rollback: nessuna migrazione/flag. File permissivo blocca startup/autorizzazione con istruzione di correggere il mode; rollback coordinato di lock, bootstrap e script.
 - Residuo: SBOM e update automation restano M05.06; egress firewall host M05.07; nessun rischio critico M01.05 accettato in deroga.
