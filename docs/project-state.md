@@ -2,15 +2,15 @@
 
 | Campo | Valore |
 |---|---|
-| Stato | M02 avviato; baseline Alembic verificata localmente e in review CI |
+| Stato | M02 avviato; baseline Alembic M02.01 chiusa e M02.02 pronta |
 | Macro attivo | `M02` — governance dati e migrazioni SQLite (`in_progress`) |
-| Micro attivo | `M02.01` — Alembic baseline e fixture legacy (`in_review`) |
-| WIP micro | 1 / limite predefinito 2 |
+| Micro attivo | nessuno; `M02.02` è `ready` |
+| WIP micro | 0 / limite predefinito 2 |
 | Ultimo gate accettato | M01 `GO`, project owner, 2026-07-15 |
 | Ultima verifica | 2026-07-15 |
 | Baseline Git | branch `feature/codex_init`; `4f0a2fb` all'avvio di M02 |
 | Runtime target | Python 3.11+, Raspberry Pi ARM64, single instance |
-| Verifica locale | `make check`: 237 test verdi; lock installato, audit e `pip check` verdi su Python 3.13; CI M02.01 3.11/3.13 pending |
+| Verifica locale | `make check`: 237 test verdi; lock installato, audit e `pip check` verdi su Python 3.13; CI run `29425476910` verde su Python 3.11/3.13 |
 | DB analizzato | `data/dritara.db`, snapshot del solo 2026-03-08 |
 | Fonte runtime | SQLite; YAML solo seed, salvo diversa indicazione |
 
@@ -58,25 +58,25 @@
 
 ## Prossimi passi
 
-1. Confermare la matrice CI Python 3.11/3.13 e chiudere M02.01.
-2. Promuovere M02.02 a `ready`: preflight e migration runner con path/lock/spazio/integrità espliciti.
+1. Avviare M02.02: preflight e migration runner con path/lock/spazio/integrità espliciti, senza database reale.
+2. Preparare evidenze sintetiche per failure mode e assenza di upgrade impliciti allo startup.
 3. M02.05/M02.07 restano bloccati fino a snapshot recente autorizzato.
 
-## Micro-task corrente
+## Prossimo micro-task ready
 
-- ID/owner/rischio: `M02.01` / Codex / high — `in_review`; introduce il sistema che governerà future modifiche schema, pur senza toccare dati reali in questo micro.
-- Outcome: Alembic riconosce in modo deterministico DB fresh, legacy sintetico, versionato e schema inatteso; nessuna migrazione parte allo startup.
-- Scope: dipendenze/config Alembic, revisione baseline, fingerprint, fixture sintetica, test e documentazione. Non-scope: DB reale, backfill, tabelle target, backup/restore operativo e integrazione startup.
-- Evidenze: 9 test migration-specific per fresh/metadata parity, fingerprint/stamp/legacy upgrade, secondo upgrade no-op, path esplicito e rifiuto senza scritture di schema divergente/downgrade; `make check` 237 test, audit e `pip check` verdi. CI 3.11/3.13 pending.
-- Rollback: rimozione coordinata di config/revisioni/dipendenze; nessun rollback dati perché soltanto DB temporanei vengono usati.
+- ID/rischio: `M02.02` / high — `ready`; realizza il comando esplicito che precederà ogni migrazione operativa.
+- Outcome: il runner usa un path assoluto, acquisisce il lock e rifiuta in modo diagnostico spazio insufficiente, fingerprint inatteso, `quick_check`/FK non validi e invocazioni concorrenti.
+- Scope previsto: preflight e orchestration esplicita su database temporanei sintetici. Non-scope: startup automatico, DB reale, backfill, nuove tabelle dominio e backup/restore operativo.
+- Dipendenza/evidenza attesa: M02.01 `done`; test di failure mode, doppia invocazione e prova che lo startup non migra.
+- Rollback previsto: rimozione coordinata del runner; nessuna modifica a dati reali.
 
 ## Ultimo micro-task completato
 
-- ID/owner/data: `M01.05` / Codex / 2026-07-15; stato `done`.
-- Outcome/evidenze: input e lock runtime/dev versionati; clean install `--require-hashes`; `pip-audit` senza vulnerabilità note; `pip check`; 228 test, docs e compile verdi su Python 3.13. La CI ha rilevato `greenlet` condizionale Linux, aggiunta esplicitamente, e test scorer dipendenti dalla directory DB locale, ora in-memory; run `29418456705` verde su Python 3.11/3.13.
-- Sicurezza: file sensibili presenti devono essere regolari, non symlink e `0600`; token/log writer applicano `0600`, directory log/backup `0700`; contract test dimostra redazione token prima del sink.
-- Rollout/rollback: nessuna migrazione/flag. File permissivo blocca startup/autorizzazione con istruzione di correggere il mode; rollback coordinato di lock, bootstrap e script.
-- Residuo: SBOM e update automation restano M05.06; egress firewall host M05.07; nessun rischio critico M01.05 accettato in deroga.
+- ID/owner/data: `M02.01` / Codex / 2026-07-15; stato `done`.
+- Outcome/evidenze: Alembic 1.18.5 e revisione baseline su schema fresh e legacy sintetico; 9 test migration-specific, `make check` con 237 test, audit e `pip check` verdi; CI run `29425476910` verde su Python 3.11/3.13.
+- Sicurezza/dati: URL SQLite esplicito e assoluto, fingerprint fail-closed e nessun URL predefinito; nessun database, backup o dato reale letto o modificato.
+- Rollout/rollback: nessuna integrazione startup e nessuna migrazione operativa; rollback coordinato di scaffold, revisione e dipendenze.
+- Residuo: runner/preflight, backup/restore, schema target, disciplina runtime e prova su copia produzione restano nei micro M02.02–M02.07.
 
 ## Ultima manutenzione governance
 
@@ -91,4 +91,4 @@ Non eseguire migrazioni sul DB reale senza snapshot consistente, checksum, dry-r
 
 ## Regola di avanzamento
 
-M01 è chiuso con gate umano `GO`; il project owner ha avviato M02 il 2026-07-15. Solo M02.01 è `in_progress`; nessun altro micro M02 può iniziare finché non è concluso o esplicitamente coordinato entro il WIP.
+M01 è chiuso con gate umano `GO`; il project owner ha avviato M02 il 2026-07-15. M02.01 è `done`, M02.02 è l'unico micro `ready` e nessun altro micro M02 può iniziare finché non è concluso o esplicitamente coordinato entro il WIP.

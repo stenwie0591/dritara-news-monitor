@@ -94,10 +94,11 @@ La Definition of Done completa è in [governance/definition-of-done.md](governan
 - Invarianti: nessuna modifica runtime o dati; M01 resta chiuso e M02 non avviato.
 - Invocazione: copiare il file nella root del progetto target e chiedere all'agente di leggerlo integralmente ed eseguirlo, fermandosi ai gate umani.
 
-## Handoff in review — M02.01
+## Ultimo handoff — M02.01
 
-- Stato/owner/data: `M02.01` `in_review`, Codex, 2026-07-15; review locale verde, matrice CI 3.11/3.13 pending.
+- Stato/owner/data: `M02.01` `done`, Codex, 2026-07-15; review locale e matrice CI 3.11/3.13 verdi.
 - Outcome: baseline Alembic deterministica su DB fresh/legacy sintetico/versionato, con schema inatteso rifiutato senza scritture e nessuna migrazione allo startup.
 - Scope/file: `alembic.ini`, `migrations/`, `src/schema_baseline.py`, fixture/test sintetici, Alembic/lock e documentazione; nessun DB reale o backup letto.
-- Rischio/evidenze: high per la futura autorità sullo schema; 9 test coprono fresh upgrade, parity metadata, legacy fingerprint/stamp/upgrade, secondo upgrade no-op, URL/path espliciti, mismatch e downgrade fail-closed. `make check` 237 test, audit e `pip check` verdi; CI pending.
+- Rischio/evidenze: high per la futura autorità sullo schema; 9 test coprono fresh upgrade, parity metadata, legacy fingerprint/stamp/upgrade, secondo upgrade no-op, URL/path espliciti, mismatch e downgrade fail-closed. `make check` 237 test, audit e `pip check` verdi; CI run `29425476910` verde su Python 3.11/3.13.
 - Rollback: rimuovere in modo coordinato scaffold, revisione e dipendenze; M02.01 non applica cambi a dati reali.
+- Passaggio: M02.02 è `ready`; M02.05/M02.07 restano `blocked` e nessun database reale è autorizzato in M02.02.

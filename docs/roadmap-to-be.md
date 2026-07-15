@@ -6,7 +6,7 @@ La roadmap segue il [Dritara Evidence-Gated Delivery Framework](governance/deliv
 
 La manutenzione documentale `GOV.NNN` definita da ADR-004 non appartiene alla sequenza degli outcome e non può essere usata per anticipare o autorizzare un macro.
 
-Stato corrente: **M02 `in_progress`**, autorizzato dal project owner il 2026-07-15 dopo il gate M01; M02.01 è in review CI ed è l'unico micro attivo. Registro eseguibile: [backlog](to-be/backlog.md).
+Stato corrente: **M02 `in_progress`**, autorizzato dal project owner il 2026-07-15 dopo il gate M01; M02.01 è `done`, M02.02 è `ready` e nessun micro è attivo. Registro eseguibile: [backlog](to-be/backlog.md).
 
 ## Sequenza
 
@@ -41,7 +41,7 @@ M00 governance
 
 ## M02 — Governance dati e migrazioni SQLite
 
-- Stato: `in_progress`; dipendenza M01 soddisfatta, M02.01 in review.
+- Stato: `in_progress`; dipendenza M01 soddisfatta, M02.01 `done` e M02.02 `ready`.
 - Outcome: schema evolvibile senza perdita, corruzione o upgrade impliciti.
 - Evidenze: fresh/legacy/production-copy upgrade, doppio upgrade no-op, restore e invarianti dati.
 - Micro-task: M02.01–M02.07.

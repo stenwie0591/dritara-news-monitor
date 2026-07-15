@@ -35,8 +35,8 @@ I task `GOV.NNN` seguono ADR-004: sono owner-requested, documentali e non autori
 
 | ID | Stato | Outcome/deliverable | Dipendenze | DoD specifica |
 |---|---|---|---|---|
-| M02.01 | in_review | Alembic baseline e fixture legacy | M01 | Fresh upgrade, fingerprint/stamp/legacy upgrade e secondo upgrade no-op passano su fixture sintetica versionata. |
-| M02.02 | proposed | Preflight e migration runner | M02.01 | Runner usa path esplicito e verifica lock, spazio, fingerprint, `quick_check` e FK; startup non migra implicitamente. |
+| M02.01 | done | Alembic baseline e fixture legacy | M01 | Fresh upgrade, fingerprint/stamp/legacy upgrade e secondo upgrade no-op passano su fixture sintetica versionata. |
+| M02.02 | ready | Preflight e migration runner | M02.01 | Runner usa path esplicito e verifica lock, spazio, fingerprint, `quick_check` e FK; startup non migra implicitamente. |
 | M02.03 | proposed | Backup e restore verificabili | M02.01 | SQLite backup API produce checksum e mode 0600; restore drill recupera DB integro entro RPO/RTO iniziali registrati. |
 | M02.04 | proposed | Schema additive per run/decision/delivery | M02.01 | Tabelle, indici, FK/CHECK/UNIQUE sono additive e coperti da integration test, con downgrade/forward recovery documentato. |
 | M02.05 | blocked | Backfill e quarantena legacy | M02.02–04, DB recente | Conteggi si riconciliano; JSON normalizzato; duplicati non cancellati, survivor policy e record quarantinati sono deterministici. |
